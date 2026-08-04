@@ -11,6 +11,7 @@ import {
   statusMarkup,
 } from '../lib/ui.js';
 import { mergePdfs } from '../lib/pdf.js';
+import { coverThumbnail } from '../lib/preview.js';
 
 export function renderMerge() {
   /** @type {{ files: File[], status: string|null, message: string, busy: boolean }} */
@@ -35,7 +36,8 @@ export function renderMerge() {
         <header class="space-y-3">
           <h1 class="text-display-md text-ink">Gabungkan beberapa PDF</h1>
           <p class="max-w-[620px] text-body text-ink-80">
-            Tambahkan dua file atau lebih, atur urutannya, lalu unduh hasil gabungannya.
+            Tambahkan dua file atau lebih, lihat pratinjau tiap file, atur urutannya
+            dengan menariknya, lalu unduh hasil gabungannya.
           </p>
         </header>
 
@@ -77,29 +79,47 @@ export function renderMerge() {
       <li
         draggable="true"
         data-index="${index}"
-        class="flex cursor-grab items-center gap-4 rounded-lg border border-hairline bg-white px-4 py-3 active:cursor-grabbing"
+        class="relative flex cursor-grab flex-col gap-3 rounded-lg border border-hairline bg-white p-3 active:cursor-grabbing"
       >
-        <i data-lucide="grip-vertical" class="size-[18px] shrink-0 text-ink-48"></i>
-        <span class="flex size-10 shrink-0 items-center justify-center rounded-sm bg-parchment text-action">
-          <i data-lucide="file-text" class="size-[18px]"></i>
+        <span class="absolute left-5 top-5 z-10 flex size-6 items-center justify-center rounded-full bg-action text-fine font-semibold text-white">
+          ${index + 1}
         </span>
-        <span class="min-w-0 flex-1">
-          <span class="block truncate text-body text-ink">${escapeHtml(file.name)}</span>
-          <span class="block text-fine text-ink-48">${index + 1} dari ${state.files.length} · ${formatBytes(file.size)}</span>
+        <i data-lucide="grip-vertical" class="absolute right-4 top-5 z-10 size-[18px] text-ink-48"></i>
+        <span data-thumb class="flex aspect-[3/4] w-full items-center justify-center overflow-hidden rounded-sm bg-parchment text-ink-48">
+          <i data-lucide="loader-circle" class="size-5 animate-spin"></i>
         </span>
-        <span class="flex shrink-0 items-center gap-1">
-          <button type="button" data-up class="${cls.iconButton}" aria-label="Naikkan urutan" ${isFirst ? 'disabled' : ''}>
-            <i data-lucide="arrow-up" class="size-[18px]"></i>
-          </button>
-          <button type="button" data-down class="${cls.iconButton}" aria-label="Turunkan urutan" ${isLast ? 'disabled' : ''}>
-            <i data-lucide="arrow-down" class="size-[18px]"></i>
-          </button>
+        <span class="min-w-0 px-1">
+          <span class="block truncate text-caption text-ink" title="${escapeHtml(file.name)}">${escapeHtml(file.name)}</span>
+          <span data-meta class="block text-fine text-ink-48">${formatBytes(file.size)}</span>
+        </span>
+        <span class="flex items-center justify-between">
+          <span class="flex items-center gap-1">
+            <button type="button" data-up class="${cls.iconButton}" aria-label="Pindahkan lebih awal" ${isFirst ? 'disabled' : ''}>
+              <i data-lucide="arrow-up" class="size-[18px]"></i>
+            </button>
+            <button type="button" data-down class="${cls.iconButton}" aria-label="Pindahkan lebih akhir" ${isLast ? 'disabled' : ''}>
+              <i data-lucide="arrow-down" class="size-[18px]"></i>
+            </button>
+          </span>
           <button type="button" data-remove class="${cls.iconButton}" aria-label="Hapus file">
             <i data-lucide="trash-2" class="size-[18px]"></i>
           </button>
         </span>
       </li>
     `);
+
+    // Cached per File, so dragging and reordering never re-rasterises a cover.
+    coverThumbnail(file).then((cover) => {
+      const thumb = row.querySelector('[data-thumb]');
+      if (!cover) {
+        thumb.innerHTML = '<i data-lucide="file-text" class="size-5"></i>';
+        paintIcons(thumb);
+        return;
+      }
+      thumb.innerHTML = `<img src="${cover.url}" alt="Pratinjau ${escapeHtml(file.name)}" class="h-full w-full object-contain" />`;
+      row.querySelector('[data-meta]').textContent =
+        `${cover.pageCount} halaman · ${formatBytes(file.size)}`;
+    });
 
     row.querySelector('[data-up]').addEventListener('click', () => move(index, index - 1));
     row.querySelector('[data-down]').addEventListener('click', () => move(index, index + 1));
@@ -141,11 +161,11 @@ export function renderMerge() {
       const heading = html(`
         <div class="mb-4 flex items-baseline justify-between">
           <h2 class="text-tagline text-ink">${state.files.length} file terpilih</h2>
-          <p class="text-fine text-ink-48">Tarik baris untuk mengubah urutan</p>
+          <p class="text-fine text-ink-48">Tarik kartu untuk mengubah urutan gabungan</p>
         </div>
       `);
       const list = document.createElement('ul');
-      list.className = 'space-y-2';
+      list.className = 'grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4';
       state.files.forEach((file, index) => list.appendChild(fileRow(file, index)));
 
       const wrapper = document.createElement('div');
