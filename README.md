@@ -1,40 +1,47 @@
-# PDF Toolkit
+# 📄 PDF Toolkit — Merge & Split PDF Client-Side
 
-Web app statis untuk **menggabungkan** dan **memisahkan** file PDF. Seluruh proses
-berjalan di browser dengan [pdf-lib](https://pdf-lib.js.org/) — tidak ada file yang
-dikirim ke server mana pun.
+[![Vite](https://img.shields.io/badge/Vite-8.2-646CFF?style=flat&logo=vite&logoColor=white)](https://vitejs.dev/)
+[![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-v4-06B6D4?style=flat&logo=tailwindcss&logoColor=white)](https://tailwindcss.com/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Privacy First](https://img.shields.io/badge/Privacy-100%25_Client--Side-green.svg)](#-privasi--keamanan)
 
-## Menjalankan secara lokal
+Aplikasi web modern, cepat, dan aman berbasis browser untuk **menggabungkan (Merge)** dan **memisahkan (Split)** dokumen PDF. Seluruh proses pengolahan dilakukan **100% secara lokal di browser Anda** menggunakan `pdf-lib` dan `pdfjs-dist` — **tidak ada berkas atau data yang diunggah ke server mana pun.**
 
-```bash
-npm install
-npm run dev
-```
+---
 
-## Build produksi
+## ✨ Fitur Utama
 
-```bash
-npm run build
-npm run preview
-```
+- 🔒 **100% Privasi & Aman**: Berkas PDF tidak pernah meninggalkan perangkat atau diunggah ke server luar.
+- 🧩 **Gabungkan PDF (Merge)**:
+  - Kombinasikan beberapa berkas PDF menjadi satu dokumen utuh.
+  - Atur ulang urutan berkas (Reorder) dengan drag/drop sebelum digabungkan.
+- ✂️ **Memisahkan PDF (Split)**:
+  - Pratinjau visual (thumbnail) untuk setiap halaman PDF dengan renderer PDF.js.
+  - Pemilihan rentang halaman fleksibel (contoh: `1-3, 5, 7-10`).
+  - Ekstraksi tiap halaman menjadi file PDF terpisah dan unduh sekaligus dalam format `.zip`.
+- 🎨 **Antarmuka Premium (Apple-inspired UI)**:
+  - Tampilan bersih, minimalis, dan responsif menggunakan Tailwind CSS v4.
+  - Dukungan visual intuitif dengan fitur area dropzone (Drag & Drop).
 
-## Deploy ke GitHub Pages
+---
 
-1. Push repo ini ke GitHub dengan branch `main`.
-2. Buka **Settings → Pages**, lalu set **Source** ke **GitHub Actions**.
-3. Workflow di `.github/workflows/deploy.yml` akan build dan deploy otomatis
-   setiap kali ada push ke `main`.
+## 🛠️ Teknologi & Library
 
-`vite.config.js` memakai `base: './'`, jadi situs bekerja baik di
-`https://user.github.io/nama-repo/` maupun di domain kustom tanpa perlu diubah.
+- **Core**: Vanilla JavaScript (ES Modules), HTML5, CSS3
+- **Bundler & Dev Server**: [Vite](https://vitejs.dev/)
+- **Styling**: [Tailwind CSS v4](https://tailwindcss.com/)
+- **PDF Processing**: [pdf-lib](https://pdf-lib.js.org/) *(Manipulasi & pembuatan berkas PDF)*
+- **PDF Rendering**: [pdfjs-dist](https://mozilla.github.io/pdf.js/) *(Render thumbnail halaman)*
+- **Icons**: [Lucide Icons](https://lucide.dev/)
 
-## Struktur
+---
 
-```
-index.html            # shell: global nav + footer
-src/main.js           # router berbasis hash (#/, #/merge, #/split)
-src/style.css         # design token (Apple) di atas Tailwind CSS v4
-src/lib/pdf.js        # merge, parsing rentang halaman, ekstraksi halaman
-src/lib/ui.js         # helper DOM, dropzone, ikon, class recipe
-src/views/            # welcome, merge, split
-```
+## 🚀 Panduan Jalankan Secara Lokal
+
+### Prasyarat
+Pastikan Anda sudah menginstall [Node.js](https://nodejs.org/) (versi 18 ke atas) dan `npm`.
+
+1. **Clone repositori ini**:
+   ```bash
+   git clone https://github.com/username/pdf-toolkit.git
+   cd pdf-toolkit
