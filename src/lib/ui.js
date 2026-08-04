@@ -85,8 +85,8 @@ export function keepPdfs(fileList) {
 }
 
 /** Triggers a browser download for the produced bytes. */
-export function downloadBytes(bytes, filename) {
-  const url = URL.createObjectURL(new Blob([bytes], { type: 'application/pdf' }));
+export function downloadBytes(bytes, filename, type = 'application/pdf') {
+  const url = URL.createObjectURL(new Blob([bytes], { type }));
   const anchor = document.createElement('a');
   anchor.href = url;
   anchor.download = filename;

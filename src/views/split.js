@@ -13,6 +13,7 @@ import {
 } from '../lib/ui.js';
 import { extractPages, loadDocument, parsePageRanges } from '../lib/pdf.js';
 import { openPreview, renderThumbnail, renderWhenVisible } from '../lib/preview.js';
+import { zipStore } from '../lib/zip.js';
 
 /** Turns [1,2,3,5] into "1-3, 5", collapsing only ascending runs. */
 function compressRanges(pages) {
@@ -31,6 +32,15 @@ function compressRanges(pages) {
   }
   if (start !== null) parts.push(start === previous ? `${start}` : `${start}-${previous}`);
   return parts.join(', ');
+}
+
+/**
+ * Filename tail describing the selection — the literal ranges when they stay
+ * short, a plain count once they would make an unwieldy file name.
+ */
+function outputSuffix(indices) {
+  const ranges = compressRanges(indices.map((index) => index + 1)).replace(/\s+/g, '');
+  return ranges.length <= 40 ? `halaman-${ranges}` : `${indices.length}-halaman`;
 }
 
 export function renderSplit() {
@@ -63,7 +73,7 @@ export function renderSplit() {
         </div>
       </div>
 
-      <section class="mx-auto max-w-[980px] space-y-8 px-5 py-16">
+      <section class="mx-auto max-w-[1120px] space-y-8 px-5 py-16">
         <header class="space-y-3">
           <h1 class="text-display-md text-ink">Ambil halaman tertentu</h1>
           <p class="max-w-[620px] text-body text-ink-80">
@@ -81,18 +91,74 @@ export function renderSplit() {
           })}
         </div>
 
-        <div data-detail class="space-y-8" style="display: none">
-          <!-- File info -->
-          <div class="flex flex-wrap items-center gap-4 rounded-lg border border-hairline bg-white px-5 py-4">
-            <span class="flex size-11 shrink-0 items-center justify-center rounded-sm bg-parchment text-action">
-              <i data-lucide="file-text" class="size-5"></i>
-            </span>
-            <span class="min-w-0 flex-1">
-              <span data-name class="block truncate text-body text-ink"></span>
-              <span data-meta class="block text-fine text-ink-48"></span>
-            </span>
-            <button type="button" data-reset class="${cls.iconButton}" aria-label="Ganti file">
-              <i data-lucide="trash-2" class="size-[18px]"></i>
+        <!-- Controls on the left, page preview in its own scroller on the right,
+             so a long document never pushes the controls off screen. -->
+        <div
+          data-detail
+          class="grid items-start gap-8 lg:grid-cols-[minmax(0,380px)_minmax(0,1fr)]"
+          style="display: none"
+        >
+          <div class="space-y-8 lg:sticky lg:top-[124px]">
+            <!-- File info -->
+            <div class="flex flex-wrap items-center gap-4 rounded-lg border border-hairline bg-white px-5 py-4">
+              <span class="flex size-11 shrink-0 items-center justify-center rounded-sm bg-parchment text-action">
+                <i data-lucide="file-text" class="size-5"></i>
+              </span>
+              <span class="min-w-0 flex-1">
+                <span data-name class="block truncate text-body text-ink"></span>
+                <span data-meta class="block text-fine text-ink-48"></span>
+              </span>
+              <button type="button" data-reset class="${cls.iconButton}" aria-label="Ganti file">
+                <i data-lucide="trash-2" class="size-[18px]"></i>
+              </button>
+            </div>
+
+            <!-- Range input -->
+            <div class="space-y-4">
+              <label for="ranges" class="block text-tagline text-ink">Halaman yang diambil</label>
+              <input
+                id="ranges"
+                type="text"
+                inputmode="numeric"
+                autocomplete="off"
+                placeholder="contoh: 1-3, 5, 7-10"
+                class="h-11 w-full rounded-full border border-hairline bg-white px-5 text-body text-ink placeholder:text-ink-48"
+              />
+              <p data-preview class="text-caption text-ink-48"></p>
+              <div class="flex flex-wrap gap-2">
+                <button type="button" data-all class="rounded-full bg-pearl px-4 py-2 text-caption text-ink-80 transition-transform active:scale-95">
+                  Pilih semua halaman
+                </button>
+                <button type="button" data-none class="rounded-full bg-pearl px-4 py-2 text-caption text-ink-80 transition-transform active:scale-95">
+                  Kosongkan pilihan
+                </button>
+              </div>
+            </div>
+
+            <!-- Output shape -->
+            <fieldset class="space-y-3">
+              <legend class="mb-3 text-tagline text-ink">Bentuk hasil unduhan</legend>
+              <label class="flex cursor-pointer items-start gap-3 rounded-md border border-hairline bg-white p-4 has-checked:border-action">
+                <input type="radio" name="output" value="single" checked class="mt-1 accent-action" />
+                <span class="min-w-0">
+                  <span class="block text-caption text-ink">Satu file gabungan</span>
+                  <span class="block text-fine text-ink-48">Halaman terpilih digabung ke dalam satu PDF.</span>
+                </span>
+              </label>
+              <label class="flex cursor-pointer items-start gap-3 rounded-md border border-hairline bg-white p-4 has-checked:border-action">
+                <input type="radio" name="output" value="zip" class="mt-1 accent-action" />
+                <span class="min-w-0">
+                  <span class="block text-caption text-ink">Terpisah per halaman (.zip)</span>
+                  <span class="block text-fine text-ink-48">Setiap halaman jadi PDF sendiri, dibungkus satu arsip ZIP.</span>
+                </span>
+              </label>
+            </fieldset>
+
+            <div data-status></div>
+
+            <button type="button" data-split class="${cls.pillPrimary}">
+              <i data-lucide="scissors" class="size-[18px]"></i>
+              Pisahkan PDF
             </button>
           </div>
 
@@ -106,38 +172,9 @@ export function renderSplit() {
               data-pages
               role="group"
               aria-label="Pilih halaman"
-              class="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5"
+              class="grid max-h-[calc(100vh-190px)] grid-cols-2 gap-4 overflow-y-auto rounded-lg bg-pearl p-4 sm:grid-cols-3 xl:grid-cols-4"
             ></div>
           </div>
-
-          <!-- Range input -->
-          <div class="space-y-4">
-            <label for="ranges" class="block text-tagline text-ink">Halaman yang diambil</label>
-            <input
-              id="ranges"
-              type="text"
-              inputmode="numeric"
-              autocomplete="off"
-              placeholder="contoh: 1-3, 5, 7-10"
-              class="h-11 w-full max-w-[420px] rounded-full border border-hairline bg-white px-5 text-body text-ink placeholder:text-ink-48"
-            />
-            <p data-preview class="text-caption text-ink-48"></p>
-            <div class="flex flex-wrap gap-2">
-              <button type="button" data-all class="rounded-full bg-pearl px-4 py-2 text-caption text-ink-80 transition-transform active:scale-95">
-                Pilih semua halaman
-              </button>
-              <button type="button" data-none class="rounded-full bg-pearl px-4 py-2 text-caption text-ink-80 transition-transform active:scale-95">
-                Kosongkan pilihan
-              </button>
-            </div>
-          </div>
-
-          <div data-status></div>
-
-          <button type="button" data-split class="${cls.pillPrimary}">
-            <i data-lucide="scissors" class="size-[18px]"></i>
-            Pisahkan PDF
-          </button>
         </div>
       </section>
     </div>
@@ -357,20 +394,45 @@ export function renderSplit() {
   splitButton.addEventListener('click', async () => {
     state.busy = true;
     splitButton.disabled = true;
-    setStatus('working', 'Mengekstrak halaman…');
 
     try {
       const raw = rangeInput.value.trim();
       const indices = parsePageRanges(raw, state.pageCount);
-      const bytes = await extractPages(state.doc, indices);
-      const filename = `${stripPdfExtension(state.file.name)}-halaman-${compressRanges(
-        indices.map((index) => index + 1),
-      ).replace(/\s+/g, '')}.pdf`;
+      const base = stripPdfExtension(state.file.name);
+      const zipped = root.querySelector('input[name="output"]:checked').value === 'zip';
 
-      downloadBytes(bytes, filename);
+      let bytes;
+      let filename;
+
+      if (zipped) {
+        const width = String(state.pageCount).length;
+        const entries = [];
+
+        for (const [position, index] of indices.entries()) {
+          setStatus('working', `Menyiapkan halaman ${position + 1} dari ${indices.length}…`);
+          // Yield so the progress line actually paints between pages.
+          await new Promise((resolve) => setTimeout(resolve));
+          entries.push({
+            name: `${base}-halaman-${String(index + 1).padStart(width, '0')}.pdf`,
+            bytes: await extractPages(state.doc, [index]),
+          });
+        }
+
+        setStatus('working', 'Membungkus arsip ZIP…');
+        bytes = zipStore(entries);
+        filename = `${base}-${outputSuffix(indices)}.zip`;
+      } else {
+        setStatus('working', 'Mengekstrak halaman…');
+        bytes = await extractPages(state.doc, indices);
+        filename = `${base}-${outputSuffix(indices)}.pdf`;
+      }
+
+      downloadBytes(bytes, filename, zipped ? 'application/zip' : 'application/pdf');
       setStatus(
         'success',
-        `Selesai. ${indices.length} halaman disimpan sebagai "${escapeHtml(filename)}".`,
+        zipped
+          ? `Selesai. ${indices.length} file PDF dibungkus dalam "${escapeHtml(filename)}".`
+          : `Selesai. ${indices.length} halaman disimpan sebagai "${escapeHtml(filename)}".`,
       );
     } catch (error) {
       setStatus('error', escapeHtml(error.message));
