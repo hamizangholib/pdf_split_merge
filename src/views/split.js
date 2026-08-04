@@ -7,6 +7,9 @@ import {
   formatBytes,
   html,
   paintIcons,
+  progressMarkup,
+  readFileBytes,
+  setProgress,
   setVisible,
   statusMarkup,
   stripPdfExtension,
@@ -89,6 +92,29 @@ export function renderSplit() {
             title: 'Tarik satu file PDF ke sini',
             hint: 'Atau klik untuk memilih file dari perangkat Anda.',
           })}
+        </div>
+
+        <!-- Load card: the only thing on screen between picking a file and the
+             document being ready, so read progress and failures cannot hide. -->
+        <div
+          data-loading
+          class="space-y-4 rounded-lg border border-hairline bg-white px-5 py-4"
+          style="display: none"
+        >
+          <div class="flex flex-wrap items-center gap-4">
+            <span data-loading-icon class="flex size-11 shrink-0 items-center justify-center rounded-sm bg-parchment text-action">
+              <i data-lucide="file-text" class="size-5"></i>
+            </span>
+            <span class="min-w-0 flex-1">
+              <span data-loading-name class="block truncate text-body text-ink"></span>
+              <span data-loading-size class="block text-fine text-ink-48"></span>
+            </span>
+            <button type="button" data-retry class="${cls.pillGhost}" style="display: none">
+              Pilih file lain
+            </button>
+          </div>
+          ${progressMarkup()}
+          <p data-loading-error class="text-caption text-[#b3261e]" style="display: none"></p>
         </div>
 
         <!-- Controls on the left, page preview in its own scroller on the right,
@@ -184,6 +210,12 @@ export function renderSplit() {
   const detailHost = root.querySelector('[data-detail]');
   const nameHost = root.querySelector('[data-name]');
   const metaHost = root.querySelector('[data-meta]');
+  const loadingHost = root.querySelector('[data-loading]');
+  const loadingNameHost = root.querySelector('[data-loading-name]');
+  const loadingSizeHost = root.querySelector('[data-loading-size]');
+  const loadingError = root.querySelector('[data-loading-error]');
+  const progressHost = root.querySelector('[data-progress]');
+  const retryButton = root.querySelector('[data-retry]');
   const pagesHost = root.querySelector('[data-pages]');
   const previewHost = root.querySelector('[data-preview]');
   const statusHost = root.querySelector('[data-status]');
@@ -318,9 +350,25 @@ export function renderSplit() {
   }
 
   async function acceptFile(file) {
-    setStatus('working', `Membaca "${escapeHtml(file.name)}"…`);
+    // Show the load card first: the file is on screen as "reading" before any
+    // parsing starts, so a slow or broken file never looks like nothing happened.
+    setVisible(uploadHost, false);
+    setVisible(detailHost, false);
+    setVisible(loadingHost, true);
+    setVisible(retryButton, false);
+    setVisible(loadingError, false);
+    loadingNameHost.textContent = file.name;
+    loadingSizeHost.textContent = formatBytes(file.size);
+    setProgress(progressHost, 'reading', 0);
+    setStatus(null, '');
+
     try {
-      const doc = await loadDocument(file);
+      const bytes = await readFileBytes(file, (ratio) =>
+        setProgress(progressHost, 'reading', ratio),
+      );
+      setProgress(progressHost, 'processing');
+
+      const doc = await loadDocument(file, bytes);
       state.file = file;
       state.doc = doc;
       state.pageCount = doc.getPageCount();
@@ -328,24 +376,27 @@ export function renderSplit() {
 
       if (state.pageCount === 0) throw new Error('Dokumen ini tidak memiliki halaman.');
 
-      state.preview = await openPreview(file);
+      state.preview = await openPreview(bytes);
+      setProgress(progressHost, 'ready');
 
       nameHost.textContent = file.name;
       metaHost.textContent = `${state.pageCount} halaman · ${formatBytes(file.size)}`;
       rangeInput.value = '';
 
-      setVisible(uploadHost, false);
+      setVisible(loadingHost, false);
       setVisible(detailHost, true);
-      setStatus(null, '');
       buildGrid();
       renderPreview();
     } catch (error) {
-      reset();
-      setStatus('error', escapeHtml(error.message));
+      clearDocument();
+      setProgress(progressHost, 'error');
+      loadingError.textContent = error.message;
+      setVisible(loadingError, true);
+      setVisible(retryButton, true);
     }
   }
 
-  function reset() {
+  function clearDocument() {
     stopObserving?.();
     stopObserving = null;
     state.preview?.destroy?.();
@@ -357,9 +408,14 @@ export function renderSplit() {
     state.selection = [];
     rangeInput.value = '';
     pagesHost.innerHTML = '';
-    setVisible(uploadHost, true);
     setVisible(detailHost, false);
     setStatus(null, '');
+  }
+
+  function reset() {
+    clearDocument();
+    setVisible(loadingHost, false);
+    setVisible(uploadHost, true);
   }
 
   /* --------------------------------------------------------------- events */
@@ -371,6 +427,7 @@ export function renderSplit() {
   );
 
   root.querySelector('[data-reset]').addEventListener('click', reset);
+  retryButton.addEventListener('click', reset);
 
   root.querySelector('[data-all]').addEventListener('click', () => {
     rangeInput.value = `1-${state.pageCount}`;

@@ -4,8 +4,8 @@ import { PDFDocument } from 'pdf-lib';
  * Loads a File/Blob into a pdf-lib document, translating library errors into
  * messages a person can act on.
  */
-export async function loadDocument(file) {
-  const bytes = await file.arrayBuffer();
+export async function loadDocument(file, source) {
+  const bytes = source ?? (await file.arrayBuffer());
   try {
     return await PDFDocument.load(bytes, { ignoreEncryption: true });
   } catch {
@@ -62,14 +62,15 @@ export function parsePageRanges(input, totalPages) {
 }
 
 /** Merges the given PDF files, in order, into a single document. */
-export async function mergePdfs(files) {
+export async function mergePdfs(files, onFile) {
   if (files.length < 2) throw new Error('Pilih minimal dua file PDF untuk digabungkan.');
 
   const merged = await PDFDocument.create();
   merged.setProducer('PDF Toolkit');
   merged.setCreator('PDF Toolkit');
 
-  for (const file of files) {
+  for (const [position, file] of files.entries()) {
+    await onFile?.(position, file);
     const source = await loadDocument(file);
     const pages = await merged.copyPages(source, source.getPageIndices());
     pages.forEach((page) => merged.addPage(page));

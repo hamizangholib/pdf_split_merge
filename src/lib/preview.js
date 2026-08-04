@@ -1,4 +1,5 @@
 import workerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
+import { readFileBytes } from './ui.js';
 
 // pdf.js is ~500 kB and only needed once a file is picked, so it is pulled in
 // on demand rather than shipped in the entry chunk.
@@ -12,10 +13,15 @@ function loadPdfjs() {
   return pdfjsPromise;
 }
 
-/** Opens a File as a pdf.js document, used purely for on-screen previews. */
-export async function openPreview(file) {
+/**
+ * Opens a File (or bytes already read from one) as a pdf.js document, used
+ * purely for on-screen previews. pdf.js transfers the buffer to its worker, so
+ * shared bytes are copied rather than handed over.
+ */
+export async function openPreview(source) {
   const pdfjs = await loadPdfjs();
-  const bytes = new Uint8Array(await file.arrayBuffer());
+  const bytes =
+    source instanceof Uint8Array ? source.slice() : new Uint8Array(await source.arrayBuffer());
   return pdfjs.getDocument({ data: bytes }).promise;
 }
 
@@ -45,17 +51,21 @@ export async function renderThumbnail(document_, pageNumber, size = 220) {
 /** First-page thumbnail of a file, cached per File so re-renders are free. */
 const coverCache = new WeakMap();
 
-export function coverThumbnail(file, size = 220) {
+export function coverThumbnail(file, { size = 220, onStage } = {}) {
   let pending = coverCache.get(file);
   if (!pending) {
     pending = (async () => {
-      const document_ = await openPreview(file);
+      const bytes = await readFileBytes(file, (ratio) => onStage?.('reading', ratio));
+      onStage?.('processing');
+      const document_ = await openPreview(bytes);
       const url = await renderThumbnail(document_, 1, size);
       return { url, pageCount: document_.numPages };
-    })().catch(() => null);
+    })();
     coverCache.set(file, pending);
   }
-  return pending;
+  // Cached results replay instantly; only the first caller sees real progress.
+  pending.then(() => onStage?.('ready')).catch(() => onStage?.('error'));
+  return pending.catch(() => null);
 }
 
 /**

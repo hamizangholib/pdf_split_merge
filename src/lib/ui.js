@@ -97,6 +97,71 @@ export function downloadBytes(bytes, filename, type = 'application/pdf') {
   setTimeout(() => URL.revokeObjectURL(url), 4000);
 }
 
+/**
+ * Reads a File into memory while reporting progress (0..1).
+ *
+ * Nothing is uploaded — this is the browser pulling the file off disk — but it
+ * is the only phase with a real percentage, so it is what the bar shows.
+ */
+export function readFileBytes(file, onProgress) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onprogress = (event) => {
+      if (event.lengthComputable) onProgress?.(event.loaded / event.total);
+    };
+    reader.onload = () => {
+      onProgress?.(1);
+      resolve(new Uint8Array(reader.result));
+    };
+    reader.onerror = () =>
+      reject(new Error(`"${file.name}" gagal dibaca dari perangkat Anda.`));
+    reader.readAsArrayBuffer(file);
+  });
+}
+
+/* --------------------------------------------------------- file progress */
+
+const stageLabels = {
+  idle: 'Belum diunggah',
+  reading: 'Membaca file',
+  processing: 'Memproses PDF',
+  ready: 'Siap',
+  error: 'Gagal dibaca',
+};
+
+/** Progress row: a stage label, a percentage, and a bar. */
+export function progressMarkup() {
+  return `
+    <span data-progress class="block space-y-1.5">
+      <span class="flex items-center justify-between gap-3">
+        <span data-stage class="text-fine text-ink-48">${stageLabels.idle}</span>
+        <span data-percent class="text-fine tabular-nums text-ink-48"></span>
+      </span>
+      <span class="block h-1.5 overflow-hidden rounded-full bg-parchment">
+        <span data-bar class="block h-full w-0 rounded-full bg-action transition-[width] duration-150"></span>
+      </span>
+    </span>
+  `;
+}
+
+/**
+ * Paints a progress row. `ratio` only applies to the reading stage; the other
+ * stages have no measurable percentage, so the bar just reflects the state.
+ */
+export function setProgress(host, stage, ratio = 0, detail = '') {
+  const bar = host.querySelector('[data-bar]');
+  const percent = stage === 'reading' ? Math.round(ratio * 100) : stage === 'idle' ? 0 : 100;
+
+  host.querySelector('[data-stage]').textContent = detail || stageLabels[stage];
+  host.querySelector('[data-percent]').textContent =
+    stage === 'reading' ? `${percent}%` : stage === 'ready' ? 'Selesai' : '';
+
+  bar.style.width = `${percent}%`;
+  bar.classList.toggle('bg-action', stage !== 'error');
+  bar.classList.toggle('bg-[#b3261e]', stage === 'error');
+  bar.classList.toggle('animate-pulse', stage === 'processing');
+}
+
 export function stripPdfExtension(name) {
   return name.replace(/\.pdf$/i, '');
 }

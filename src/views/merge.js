@@ -7,6 +7,8 @@ import {
   formatBytes,
   html,
   paintIcons,
+  progressMarkup,
+  setProgress,
   setVisible,
   statusMarkup,
 } from '../lib/ui.js';
@@ -88,9 +90,10 @@ export function renderMerge() {
         <span data-thumb class="flex aspect-[3/4] w-full items-center justify-center overflow-hidden rounded-sm bg-parchment text-ink-48">
           <i data-lucide="loader-circle" class="size-5 animate-spin"></i>
         </span>
-        <span class="min-w-0 px-1">
+        <span class="min-w-0 space-y-2 px-1">
           <span class="block truncate text-caption text-ink" title="${escapeHtml(file.name)}">${escapeHtml(file.name)}</span>
           <span data-meta class="block text-fine text-ink-48">${formatBytes(file.size)}</span>
+          ${progressMarkup()}
         </span>
         <span class="flex items-center justify-between">
           <span class="flex items-center gap-1">
@@ -108,17 +111,24 @@ export function renderMerge() {
       </li>
     `);
 
+    const progressHost = row.querySelector('[data-progress]');
+    setProgress(progressHost, 'reading', 0);
+
     // Cached per File, so dragging and reordering never re-rasterises a cover.
-    coverThumbnail(file).then((cover) => {
+    coverThumbnail(file, {
+      onStage: (stage, ratio) => setProgress(progressHost, stage, ratio),
+    }).then((cover) => {
       const thumb = row.querySelector('[data-thumb]');
       if (!cover) {
-        thumb.innerHTML = '<i data-lucide="file-text" class="size-5"></i>';
+        thumb.innerHTML = '<i data-lucide="circle-alert" class="size-5 text-[#b3261e]"></i>';
         paintIcons(thumb);
         return;
       }
       thumb.innerHTML = `<img src="${cover.url}" alt="Pratinjau ${escapeHtml(file.name)}" class="h-full w-full object-contain" />`;
       row.querySelector('[data-meta]').textContent =
         `${cover.pageCount} halaman · ${formatBytes(file.size)}`;
+      // Cover and page count are proof enough that the file is ready.
+      setVisible(progressHost, false);
     });
 
     row.querySelector('[data-up]').addEventListener('click', () => move(index, index - 1));
@@ -214,7 +224,14 @@ export function renderMerge() {
     setStatus('working', `Menggabungkan ${state.files.length} file…`);
 
     try {
-      const bytes = await mergePdfs(state.files);
+      const bytes = await mergePdfs(state.files, async (position, file) => {
+        setStatus(
+          'working',
+          `Menggabungkan file ${position + 1} dari ${state.files.length}: "${escapeHtml(file.name)}"…`,
+        );
+        // Yield so the progress line paints between files.
+        await new Promise((resolve) => setTimeout(resolve));
+      });
       downloadBytes(bytes, 'gabungan.pdf');
       setStatus('success', 'Selesai. File "gabungan.pdf" sedang diunduh.');
     } catch (error) {
