@@ -45,3 +45,77 @@ Pastikan Anda sudah menginstall [Node.js](https://nodejs.org/) (versi 18 ke atas
    ```bash
    git clone https://github.com/username/pdf-toolkit.git
    cd pdf-toolkit
+   ```
+
+2. **Install dependensi**:
+   ```bash
+   npm install
+   ```
+
+3. **Jalankan server pengembang (Dev Server)**:
+   ```bash
+   npm run dev
+   ```
+   Buka alamat local di browser Anda (biasanya `http://localhost:5173`).
+
+4. **Build untuk Produksi**:
+   ```bash
+   npm run build
+   ```
+   Hasil build statis akan tersimpan di direktori `dist/`. Anda dapat mempratinjaunya dengan:
+   ```bash
+   npm run preview
+   ```
+
+---
+
+## 🌐 Deploy ke GitHub Pages
+
+Proyek ini telah dilengkapi dengan workflow CI/CD via **GitHub Actions** (`.github/workflows/deploy.yml`).
+
+1. Push perubahan Anda ke branch `main`:
+   ```bash
+   git push origin main
+   ```
+2. Buka repositori Anda di GitHub → **Settings** → **Pages**.
+3. Pada bagian **Source**, pilih **GitHub Actions**.
+4. Aplikasi akan otomatis di-build dan di-deploy setiap kali ada pembaruan di branch `main`.
+
+---
+
+## 📁 Struktur Direktori
+
+```
+pdf-toolkit/
+├── .github/workflows/    # Automasi GitHub Actions untuk deployment
+├── src/
+│   ├── lib/              # Core module & helper
+│   │   ├── pdf.js        # Pengolah PDF (Merge, Split, Parse range)
+│   │   ├── preview.js    # Rendering thumbnail halaman PDF dengan PDF.js
+│   │   ├── ui.js         # Utilities DOM & UI helper
+│   │   └── zip.js        # Generator file ZIP client-side
+│   ├── views/            # Tampilan halaman
+│   │   ├── welcome.js    # Halaman Utama / Landing page
+│   │   ├── merge.js      # Fitur penggabungan PDF
+│   │   └── split.js      # Fitur pemisahan PDF
+│   ├── main.js           # Router (Hash-based) & Entry point
+│   └── style.css         # Styling utama & Tailwind v4 imports
+├── index.html            # Shell HTML utama
+├── vite.config.js        # Konfigurasi Vite (Base URL relatif)
+└── package.json          # Dependensi & script proyek
+```
+
+---
+
+## 🔒 Privasi & Keamanan Data
+
+Keamanan dokumen pengguna adalah fokus utama proyek ini:
+- Pemrosesan dokumen berlangsung sepenuhnya di memori browser pengguna (*in-memory processing*).
+- Tidak ada backend API yang menyimpan maupun membaca isi dokumen Anda.
+- Aman digunakan untuk dokumen sensitif atau rahasia.
+
+---
+
+## 📄 Lisensi
+
+Proyek ini dilindungi di bawah lisensi [MIT License](LICENSE).
