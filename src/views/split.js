@@ -1,22 +1,21 @@
 import {
-  attachDropzone,
   cls,
   downloadBytes,
-  dropzoneMarkup,
+  errorText,
   escapeHtml,
   formatBytes,
   html,
   paintIcons,
-  progressMarkup,
-  readFileBytes,
-  setProgress,
   setVisible,
   statusMarkup,
   stripPdfExtension,
 } from '../lib/ui.js';
 import { extractPages, loadDocument, parsePageRanges } from '../lib/pdf.js';
-import { openPreview, renderThumbnail, renderWhenVisible } from '../lib/preview.js';
+import { openPreview } from '../lib/preview.js';
+import { attachThumbnails } from '../lib/pagegrid.js';
+import { createFileLoader } from '../lib/loader.js';
 import { zipStore } from '../lib/zip.js';
+import { subNavMarkup } from '../lib/nav.js';
 
 /** Turns [1,2,3,5] into "1-3, 5", collapsing only ascending runs. */
 function compressRanges(pages) {
@@ -60,21 +59,11 @@ export function renderSplit() {
   };
 
   /** Torn down whenever a new file replaces the current one. */
-  let stopObserving = null;
+  let stopThumbnails = null;
 
   const root = html(`
     <div>
-      <!-- sub-nav-frosted -->
-      <div class="sticky top-11 z-40 border-b border-hairline bg-parchment/80 backdrop-blur-xl backdrop-saturate-150">
-        <div class="mx-auto flex h-[52px] max-w-[980px] items-center gap-4 px-5">
-          <a href="#/" class="flex items-center gap-1.5 text-caption ${cls.link}">
-            <i data-lucide="arrow-left" class="size-4"></i>
-            Beranda
-          </a>
-          <span class="text-tagline text-ink">Pisahkan</span>
-          <a href="#/merge" class="ml-auto text-caption ${cls.link}">Gabungkan PDF</a>
-        </div>
-      </div>
+      ${subNavMarkup('#/split')}
 
       <section class="mx-auto max-w-[1120px] space-y-8 px-5 py-16">
         <header class="space-y-3">
@@ -85,37 +74,7 @@ export function renderSplit() {
           </p>
         </header>
 
-        <div data-upload>
-          ${dropzoneMarkup({
-            id: 'split',
-            multiple: false,
-            title: 'Tarik satu file PDF ke sini',
-            hint: 'Atau klik untuk memilih file dari perangkat Anda.',
-          })}
-        </div>
-
-        <!-- Load card: the only thing on screen between picking a file and the
-             document being ready, so read progress and failures cannot hide. -->
-        <div
-          data-loading
-          class="space-y-4 rounded-lg border border-hairline bg-white px-5 py-4"
-          style="display: none"
-        >
-          <div class="flex flex-wrap items-center gap-4">
-            <span data-loading-icon class="flex size-11 shrink-0 items-center justify-center rounded-sm bg-parchment text-action">
-              <i data-lucide="file-text" class="size-5"></i>
-            </span>
-            <span class="min-w-0 flex-1">
-              <span data-loading-name class="block truncate text-body text-ink"></span>
-              <span data-loading-size class="block text-fine text-ink-48"></span>
-            </span>
-            <button type="button" data-retry class="${cls.pillGhost}" style="display: none">
-              Pilih file lain
-            </button>
-          </div>
-          ${progressMarkup()}
-          <p data-loading-error class="text-caption text-[#b3261e]" style="display: none"></p>
-        </div>
+        <div data-loader></div>
 
         <!-- Controls on the left, page preview in its own scroller on the right,
              so a long document never pushes the controls off screen. -->
@@ -152,26 +111,22 @@ export function renderSplit() {
               />
               <p data-preview class="text-caption text-ink-48"></p>
               <div class="flex flex-wrap gap-2">
-                <button type="button" data-all class="rounded-full bg-pearl px-4 py-2 text-caption text-ink-80 transition-transform active:scale-95">
-                  Pilih semua halaman
-                </button>
-                <button type="button" data-none class="rounded-full bg-pearl px-4 py-2 text-caption text-ink-80 transition-transform active:scale-95">
-                  Kosongkan pilihan
-                </button>
+                <button type="button" data-all class="${cls.chip}">Pilih semua halaman</button>
+                <button type="button" data-none class="${cls.chip}">Kosongkan pilihan</button>
               </div>
             </div>
 
             <!-- Output shape -->
             <fieldset class="space-y-3">
               <legend class="mb-3 text-tagline text-ink">Bentuk hasil unduhan</legend>
-              <label class="flex cursor-pointer items-start gap-3 rounded-md border border-hairline bg-white p-4 has-checked:border-action">
+              <label class="${cls.radioCard}">
                 <input type="radio" name="output" value="single" checked class="mt-1 accent-action" />
                 <span class="min-w-0">
                   <span class="block text-caption text-ink">Satu file gabungan</span>
                   <span class="block text-fine text-ink-48">Halaman terpilih digabung ke dalam satu PDF.</span>
                 </span>
               </label>
-              <label class="flex cursor-pointer items-start gap-3 rounded-md border border-hairline bg-white p-4 has-checked:border-action">
+              <label class="${cls.radioCard}">
                 <input type="radio" name="output" value="zip" class="mt-1 accent-action" />
                 <span class="min-w-0">
                   <span class="block text-caption text-ink">Terpisah per halaman (.zip)</span>
@@ -206,16 +161,9 @@ export function renderSplit() {
     </div>
   `);
 
-  const uploadHost = root.querySelector('[data-upload]');
   const detailHost = root.querySelector('[data-detail]');
   const nameHost = root.querySelector('[data-name]');
   const metaHost = root.querySelector('[data-meta]');
-  const loadingHost = root.querySelector('[data-loading]');
-  const loadingNameHost = root.querySelector('[data-loading-name]');
-  const loadingSizeHost = root.querySelector('[data-loading-size]');
-  const loadingError = root.querySelector('[data-loading-error]');
-  const progressHost = root.querySelector('[data-progress]');
-  const retryButton = root.querySelector('[data-retry]');
   const pagesHost = root.querySelector('[data-pages]');
   const previewHost = root.querySelector('[data-preview]');
   const statusHost = root.querySelector('[data-status]');
@@ -235,56 +183,35 @@ export function renderSplit() {
 
   /* ------------------------------------------------------------- page grid */
 
-  function pageCard(pageNumber) {
-    const card = html(`
-      <button
-        type="button"
-        data-page="${pageNumber}"
-        aria-pressed="false"
-        class="group relative flex flex-col gap-2 rounded-md border border-hairline bg-white p-2 text-left transition-transform active:scale-95"
-      >
-        <span data-thumb class="flex aspect-[3/4] w-full items-center justify-center overflow-hidden rounded-sm bg-parchment text-ink-48">
-          <i data-lucide="loader-circle" class="size-5 animate-spin"></i>
-        </span>
-        <span class="flex items-center justify-between px-1 pb-0.5">
-          <span class="text-fine text-ink-80">Halaman ${pageNumber}</span>
-          <span data-order class="hidden size-5 items-center justify-center rounded-full bg-action text-[10px] font-semibold text-white"></span>
-        </span>
-      </button>
-    `);
-
-    card.addEventListener('click', () => togglePage(pageNumber));
-    return card;
-  }
-
   function buildGrid() {
-    stopObserving?.();
+    stopThumbnails?.();
     pagesHost.innerHTML = '';
 
-    const disconnectors = [];
     for (let pageNumber = 1; pageNumber <= state.pageCount; pageNumber++) {
-      const card = pageCard(pageNumber);
+      const card = html(`
+        <button
+          type="button"
+          data-page="${pageNumber}"
+          aria-pressed="false"
+          class="group relative flex flex-col gap-2 rounded-md border border-hairline bg-white p-2 text-left transition-transform active:scale-95"
+        >
+          <span data-thumb class="flex aspect-[3/4] w-full items-center justify-center overflow-hidden rounded-sm bg-parchment text-ink-48">
+            <i data-lucide="loader-circle" class="size-5 animate-spin"></i>
+          </span>
+          <span class="flex items-center justify-between px-1 pb-0.5">
+            <span class="text-fine text-ink-80">Halaman ${pageNumber}</span>
+            <span data-order class="hidden size-5 items-center justify-center rounded-full bg-action text-[10px] font-semibold text-white"></span>
+          </span>
+        </button>
+      `);
+      card.addEventListener('click', () => togglePage(pageNumber));
       pagesHost.appendChild(card);
-
-      const document_ = state.preview;
-      disconnectors.push(
-        renderWhenVisible(card, async () => {
-          // The file may have been swapped out while this card waited offscreen.
-          if (state.preview !== document_) return;
-          const thumb = card.querySelector('[data-thumb]');
-          try {
-            const url = await renderThumbnail(document_, pageNumber);
-            if (state.preview !== document_) return;
-            thumb.innerHTML = `<img src="${url}" alt="Pratinjau halaman ${pageNumber}" class="h-full w-full object-contain" />`;
-          } catch {
-            thumb.innerHTML = '<i data-lucide="file-text" class="size-5"></i>';
-            paintIcons(thumb);
-          }
-        }),
-      );
     }
 
-    stopObserving = () => disconnectors.forEach((stop) => stop());
+    const document_ = state.preview;
+    stopThumbnails = attachThumbnails(pagesHost, document_, {
+      isStale: () => state.preview !== document_,
+    });
     paintIcons(pagesHost);
   }
 
@@ -349,56 +276,11 @@ export function renderSplit() {
     }
   }
 
-  async function acceptFile(file) {
-    // Show the load card first: the file is on screen as "reading" before any
-    // parsing starts, so a slow or broken file never looks like nothing happened.
-    setVisible(uploadHost, false);
-    setVisible(detailHost, false);
-    setVisible(loadingHost, true);
-    setVisible(retryButton, false);
-    setVisible(loadingError, false);
-    loadingNameHost.textContent = file.name;
-    loadingSizeHost.textContent = formatBytes(file.size);
-    setProgress(progressHost, 'reading', 0);
-    setStatus(null, '');
-
-    try {
-      const bytes = await readFileBytes(file, (ratio) =>
-        setProgress(progressHost, 'reading', ratio),
-      );
-      setProgress(progressHost, 'processing');
-
-      const doc = await loadDocument(file, bytes);
-      state.file = file;
-      state.doc = doc;
-      state.pageCount = doc.getPageCount();
-      state.selection = [];
-
-      if (state.pageCount === 0) throw new Error('Dokumen ini tidak memiliki halaman.');
-
-      state.preview = await openPreview(bytes);
-      setProgress(progressHost, 'ready');
-
-      nameHost.textContent = file.name;
-      metaHost.textContent = `${state.pageCount} halaman · ${formatBytes(file.size)}`;
-      rangeInput.value = '';
-
-      setVisible(loadingHost, false);
-      setVisible(detailHost, true);
-      buildGrid();
-      renderPreview();
-    } catch (error) {
-      clearDocument();
-      setProgress(progressHost, 'error');
-      loadingError.textContent = error.message;
-      setVisible(loadingError, true);
-      setVisible(retryButton, true);
-    }
-  }
+  /* ------------------------------------------------------------ file intake */
 
   function clearDocument() {
-    stopObserving?.();
-    stopObserving = null;
+    stopThumbnails?.();
+    stopThumbnails = null;
     state.preview?.destroy?.();
 
     state.file = null;
@@ -412,22 +294,34 @@ export function renderSplit() {
     setStatus(null, '');
   }
 
-  function reset() {
-    clearDocument();
-    setVisible(loadingHost, false);
-    setVisible(uploadHost, true);
-  }
+  const loader = createFileLoader({
+    id: 'split',
+    onReset: clearDocument,
+    onReady: async (file, bytes) => {
+      const doc = await loadDocument(file, bytes);
+      state.file = file;
+      state.doc = doc;
+      state.pageCount = doc.getPageCount();
+      state.selection = [];
+
+      if (state.pageCount === 0) throw new Error('Dokumen ini tidak memiliki halaman.');
+
+      state.preview = await openPreview(bytes);
+
+      nameHost.textContent = file.name;
+      metaHost.textContent = `${state.pageCount} halaman · ${formatBytes(file.size)}`;
+      rangeInput.value = '';
+
+      setVisible(detailHost, true);
+      buildGrid();
+      renderPreview();
+    },
+  });
+  root.querySelector('[data-loader]').replaceWith(loader.element);
 
   /* --------------------------------------------------------------- events */
 
-  attachDropzone(
-    root.querySelector('#split-zone'),
-    root.querySelector('#split-input'),
-    (files) => acceptFile(files[0]),
-  );
-
-  root.querySelector('[data-reset]').addEventListener('click', reset);
-  retryButton.addEventListener('click', reset);
+  root.querySelector('[data-reset]').addEventListener('click', () => loader.reset());
 
   root.querySelector('[data-all]').addEventListener('click', () => {
     rangeInput.value = `1-${state.pageCount}`;
@@ -492,7 +386,7 @@ export function renderSplit() {
           : `Selesai. ${indices.length} halaman disimpan sebagai "${escapeHtml(filename)}".`,
       );
     } catch (error) {
-      setStatus('error', escapeHtml(error.message));
+      setStatus('error', escapeHtml(errorText(error)));
     } finally {
       state.busy = false;
       renderPreview();

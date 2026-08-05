@@ -3,6 +3,7 @@ import {
   cls,
   downloadBytes,
   dropzoneMarkup,
+  errorText,
   escapeHtml,
   formatBytes,
   html,
@@ -14,27 +15,18 @@ import {
 } from '../lib/ui.js';
 import { mergePdfs } from '../lib/pdf.js';
 import { coverThumbnail } from '../lib/preview.js';
+import { attachDragReorder } from '../lib/pagegrid.js';
+import { subNavMarkup } from '../lib/nav.js';
 
 export function renderMerge() {
   /** @type {{ files: File[], status: string|null, message: string, busy: boolean }} */
   const state = { files: [], status: null, message: '', busy: false };
-  let dragIndex = null;
 
   const root = html(`
     <div>
-      <!-- sub-nav-frosted -->
-      <div class="sticky top-11 z-40 border-b border-hairline bg-parchment/80 backdrop-blur-xl backdrop-saturate-150">
-        <div class="mx-auto flex h-[52px] max-w-[980px] items-center gap-4 px-5">
-          <a href="#/" class="flex items-center gap-1.5 text-caption ${cls.link}">
-            <i data-lucide="arrow-left" class="size-4"></i>
-            Beranda
-          </a>
-          <span class="text-tagline text-ink">Gabungkan</span>
-          <a href="#/split" class="ml-auto text-caption ${cls.link}">Pisahkan PDF</a>
-        </div>
-      </div>
+      ${subNavMarkup('#/merge')}
 
-      <section class="mx-auto max-w-[980px] space-y-8 px-5 py-16">
+      <section class="mx-auto max-w-[1120px] space-y-8 px-5 py-16">
         <header class="space-y-3">
           <h1 class="text-display-md text-ink">Gabungkan beberapa PDF</h1>
           <p class="max-w-[620px] text-body text-ink-80">
@@ -139,21 +131,6 @@ export function renderMerge() {
       renderList();
     });
 
-    row.addEventListener('dragstart', () => {
-      dragIndex = index;
-      row.classList.add('opacity-40');
-    });
-    row.addEventListener('dragend', () => {
-      dragIndex = null;
-      row.classList.remove('opacity-40');
-    });
-    row.addEventListener('dragover', (event) => event.preventDefault());
-    row.addEventListener('drop', (event) => {
-      event.preventDefault();
-      event.stopPropagation();
-      if (dragIndex !== null) move(dragIndex, index);
-    });
-
     return row;
   }
 
@@ -177,6 +154,7 @@ export function renderMerge() {
       const list = document.createElement('ul');
       list.className = 'grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4';
       state.files.forEach((file, index) => list.appendChild(fileRow(file, index)));
+      attachDragReorder(list, move);
 
       const wrapper = document.createElement('div');
       wrapper.append(heading, list);
@@ -235,7 +213,7 @@ export function renderMerge() {
       downloadBytes(bytes, 'gabungan.pdf');
       setStatus('success', 'Selesai. File "gabungan.pdf" sedang diunduh.');
     } catch (error) {
-      setStatus('error', escapeHtml(error.message));
+      setStatus('error', escapeHtml(errorText(error)));
     } finally {
       state.busy = false;
       mergeButton.disabled = state.files.length < 2;

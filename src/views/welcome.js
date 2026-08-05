@@ -1,4 +1,5 @@
 import { html, cls } from '../lib/ui.js';
+import { tools } from '../lib/nav.js';
 
 /**
  * The landing surface: a greeting, then the single decision the visitor has to
@@ -16,56 +17,42 @@ export function renderWelcome() {
             Rapikan PDF Anda.<br />Tanpa meninggalkan browser.
           </h1>
           <p class="mx-auto max-w-[620px] text-lead-airy text-ink-80">
-            Gabungkan beberapa dokumen menjadi satu, atau ambil hanya halaman yang Anda
-            butuhkan. Semuanya diproses di perangkat Anda sendiri.
+            Gabungkan, pisahkan, susun ulang halaman, ubah gambar menjadi PDF, dan
+            perkecil ukuran file. Semuanya diproses di perangkat Anda sendiri.
           </p>
           <p class="text-tagline text-ink">Apa yang ingin Anda lakukan?</p>
         </div>
       </section>
 
-      <!-- The two choices, edge to edge -->
+      <!-- Every tool, alternating light and near-black tiles -->
       <section class="grid md:grid-cols-2">
-        <!-- Merge: parchment tile -->
-        <a
-          href="#/merge"
-          class="group flex flex-col items-center gap-6 bg-parchment px-6 py-20 text-center transition-transform active:scale-[0.99]"
-        >
-          <span
-            class="flex size-20 items-center justify-center rounded-lg bg-white text-action shadow-product"
-          >
-            <i data-lucide="combine" class="size-9"></i>
-          </span>
-          <h2 class="text-display-md text-ink">Gabungkan PDF</h2>
-          <p class="max-w-[380px] text-body text-ink-80">
-            Satukan beberapa file PDF menjadi satu dokumen, dengan urutan yang Anda
-            tentukan sendiri.
-          </p>
-          <span class="${cls.pillPrimary}">
-            Mulai gabungkan
-            <i data-lucide="chevron-right" class="size-4"></i>
-          </span>
-        </a>
-
-        <!-- Split: near-black tile -->
-        <a
-          href="#/split"
-          class="group flex flex-col items-center gap-6 bg-tile-1 px-6 py-20 text-center transition-transform active:scale-[0.99]"
-        >
-          <span
-            class="flex size-20 items-center justify-center rounded-lg bg-tile-2 text-action-dark shadow-product"
-          >
-            <i data-lucide="scissors" class="size-9"></i>
-          </span>
-          <h2 class="text-display-md text-white">Pisahkan PDF</h2>
-          <p class="max-w-[380px] text-body text-muted-dark">
-            Ambil halaman tertentu dari sebuah PDF — misalnya 1-3, 5, 7-10 — dan simpan
-            sebagai file baru.
-          </p>
-          <span class="${cls.pillPrimary}">
-            Mulai pisahkan
-            <i data-lucide="chevron-right" class="size-4"></i>
-          </span>
-        </a>
+        ${tools
+          .map((tool, index) => {
+            const dark = index % 2 === 1;
+            return `
+              <a
+                href="${tool.hash}"
+                class="group flex flex-col items-center gap-5 px-6 py-16 text-center transition-transform active:scale-[0.99] ${
+                  dark ? 'bg-tile-1' : 'bg-parchment'
+                } ${index === tools.length - 1 && tools.length % 2 === 1 ? 'md:col-span-2' : ''}"
+              >
+                <span class="flex size-20 items-center justify-center rounded-lg shadow-product ${
+                  dark ? 'bg-tile-2 text-action-dark' : 'bg-white text-action'
+                }">
+                  <i data-lucide="${tool.icon}" class="size-9"></i>
+                </span>
+                <h2 class="text-display-md ${dark ? 'text-white' : 'text-ink'}">${tool.title}</h2>
+                <p class="max-w-[380px] text-body ${dark ? 'text-muted-dark' : 'text-ink-80'}">
+                  ${tool.blurb}
+                </p>
+                <span class="${cls.pillPrimary}">
+                  Buka
+                  <i data-lucide="chevron-right" class="size-4"></i>
+                </span>
+              </a>
+            `;
+          })
+          .join('')}
       </section>
 
       <!-- Reassurance strip -->

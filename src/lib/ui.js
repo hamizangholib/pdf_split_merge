@@ -1,4 +1,5 @@
 import {
+  Archive,
   ArrowDown,
   ArrowLeft,
   ArrowUp,
@@ -10,11 +11,17 @@ import {
   FileText,
   Files,
   GripVertical,
+  Image,
   Layers,
+  LayoutGrid,
   LoaderCircle,
+  RotateCw,
+  Save,
   Scissors,
   ShieldCheck,
+  Tag,
   Trash2,
+  Undo2,
   Upload,
   createIcons,
 } from 'lucide';
@@ -22,6 +29,7 @@ import {
 // Only the icons this app actually renders — importing lucide's full `icons`
 // map would ship every icon in the library.
 const usedIcons = {
+  Archive,
   ArrowDown,
   ArrowLeft,
   ArrowUp,
@@ -33,11 +41,17 @@ const usedIcons = {
   FileText,
   Files,
   GripVertical,
+  Image,
   Layers,
+  LayoutGrid,
   LoaderCircle,
+  RotateCw,
+  Save,
   Scissors,
   ShieldCheck,
+  Tag,
   Trash2,
+  Undo2,
   Upload,
 };
 
@@ -69,6 +83,16 @@ export function escapeHtml(value) {
   );
 }
 
+/**
+ * Not every thrown value carries a usable `message` — pdf-lib's image decoders
+ * in particular throw objects that stringify to nothing, which used to surface
+ * in the UI as the literal word "undefined".
+ */
+export function errorText(error) {
+  const message = error?.message ?? (typeof error === 'string' ? error : '');
+  return message.trim() || 'Terjadi kesalahan yang tidak terduga saat memproses file ini.';
+}
+
 export function formatBytes(bytes) {
   if (!Number.isFinite(bytes) || bytes <= 0) return '0 KB';
   const units = ['B', 'KB', 'MB', 'GB'];
@@ -81,6 +105,13 @@ export function formatBytes(bytes) {
 export function keepPdfs(fileList) {
   return Array.from(fileList).filter(
     (file) => file.type === 'application/pdf' || /\.pdf$/i.test(file.name),
+  );
+}
+
+/** Keeps only images the browser can decode into a canvas. */
+export function keepImages(fileList) {
+  return Array.from(fileList).filter(
+    (file) => file.type.startsWith('image/') || /\.(jpe?g|png|webp|gif|bmp|avif)$/i.test(file.name),
   );
 }
 
@@ -170,7 +201,7 @@ export function stripPdfExtension(name) {
  * Wires the shared drag & drop behaviour onto a dropzone element.
  * `onFiles` receives an array of PDF files.
  */
-export function attachDropzone(zone, input, onFiles) {
+export function attachDropzone(zone, input, onFiles, filter = keepPdfs) {
   const setDragging = (active) => zone.classList.toggle('is-dragging', active);
 
   zone.addEventListener('click', () => input.click());
@@ -197,12 +228,12 @@ export function attachDropzone(zone, input, onFiles) {
   );
 
   zone.addEventListener('drop', (event) => {
-    const files = keepPdfs(event.dataTransfer?.files ?? []);
+    const files = filter(event.dataTransfer?.files ?? []);
     if (files.length) onFiles(files);
   });
 
   input.addEventListener('change', () => {
-    const files = keepPdfs(input.files ?? []);
+    const files = filter(input.files ?? []);
     if (files.length) onFiles(files);
     input.value = '';
   });
@@ -223,10 +254,13 @@ export const cls = {
     'inline-flex size-9 items-center justify-center rounded-sm text-ink-48 transition-transform hover:text-ink active:scale-95 disabled:pointer-events-none disabled:opacity-30',
   card: 'rounded-lg border border-hairline bg-white p-6',
   link: 'text-action transition-opacity hover:opacity-70',
+  chip: 'rounded-full bg-pearl px-4 py-2 text-caption text-ink-80 transition-transform active:scale-95 disabled:pointer-events-none disabled:opacity-40',
+  radioCard:
+    'flex cursor-pointer items-start gap-3 rounded-md border border-hairline bg-white p-4 has-checked:border-action',
 };
 
 /** The dropzone shell, shared by both tools. */
-export function dropzoneMarkup({ id, multiple, title, hint }) {
+export function dropzoneMarkup({ id, multiple, title, hint, accept = 'application/pdf,.pdf' }) {
   return `
     <div class="space-y-4">
       <div
@@ -245,7 +279,7 @@ export function dropzoneMarkup({ id, multiple, title, hint }) {
       <input
         id="${id}-input"
         type="file"
-        accept="application/pdf,.pdf"
+        accept="${accept}"
         ${multiple ? 'multiple' : ''}
         class="hidden"
       />
@@ -260,6 +294,7 @@ export function statusMarkup(state, message) {
   const themes = {
     working: { icon: 'loader-circle', tone: 'text-ink-80', spin: true },
     success: { icon: 'circle-check', tone: 'text-action', spin: false },
+    warning: { icon: 'circle-alert', tone: 'text-[#8a5a00]', spin: false },
     error: { icon: 'circle-alert', tone: 'text-[#b3261e]', spin: false },
   };
   const theme = themes[state] ?? themes.working;

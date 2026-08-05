@@ -1,4 +1,4 @@
-import { PDFDocument } from 'pdf-lib';
+import { PDFDocument, degrees } from 'pdf-lib';
 
 /**
  * Loads a File/Blob into a pdf-lib document, translating library errors into
@@ -62,7 +62,7 @@ export function parsePageRanges(input, totalPages) {
 }
 
 /** Merges the given PDF files, in order, into a single document. */
-export async function mergePdfs(files, onFile) {
+export async function mergePdfs(files, onFile, decorate) {
   if (files.length < 2) throw new Error('Pilih minimal dua file PDF untuk digabungkan.');
 
   const merged = await PDFDocument.create();
@@ -79,11 +79,12 @@ export async function mergePdfs(files, onFile) {
   if (merged.getPageCount() === 0) {
     throw new Error('File yang dipilih tidak memiliki halaman apa pun.');
   }
+  decorate?.(merged);
   return merged.save();
 }
 
 /** Extracts the given zero-based page indices into a brand new document. */
-export async function extractPages(sourceDocument, indices) {
+export async function extractPages(sourceDocument, indices, decorate) {
   const output = await PDFDocument.create();
   output.setProducer('PDF Toolkit');
   output.setCreator('PDF Toolkit');
@@ -91,5 +92,35 @@ export async function extractPages(sourceDocument, indices) {
   const pages = await output.copyPages(sourceDocument, indices);
   pages.forEach((page) => output.addPage(page));
 
+  decorate?.(output);
+  return output.save();
+}
+
+/**
+ * Rebuilds a document from `order` — a list of { index, rotation } describing
+ * which source page goes where, and how much extra rotation it gets on top of
+ * the rotation it already carries.
+ */
+export async function arrangePages(sourceDocument, order, decorate) {
+  if (order.length === 0) throw new Error('Tidak ada halaman yang tersisa untuk disimpan.');
+
+  const output = await PDFDocument.create();
+  output.setProducer('PDF Toolkit');
+  output.setCreator('PDF Toolkit');
+
+  const pages = await output.copyPages(
+    sourceDocument,
+    order.map((entry) => entry.index),
+  );
+
+  pages.forEach((page, position) => {
+    const extra = order[position].rotation ?? 0;
+    if (extra) {
+      page.setRotation(degrees((page.getRotation().angle + extra) % 360));
+    }
+    output.addPage(page);
+  });
+
+  decorate?.(output);
   return output.save();
 }
