@@ -14,6 +14,7 @@ import { loadDocument } from '../lib/pdf.js';
 import { compressPdf } from '../lib/compress.js';
 import { createFileLoader } from '../lib/loader.js';
 import { subNavMarkup } from '../lib/nav.js';
+import { brandIcon } from '../lib/icons.js';
 
 export function renderCompress() {
   /** @type {{ file: File|null, bytes: Uint8Array|null, pageCount: number, status: string|null, message: string, busy: boolean }} */
@@ -83,7 +84,7 @@ export function renderCompress() {
           <div data-status></div>
 
           <button type="button" data-compress class="${cls.pillPrimary}">
-            <i data-lucide="archive" class="size-[18px]"></i>
+            ${brandIcon('compress', 'size-[18px]')}
             Perkecil PDF
           </button>
         </div>

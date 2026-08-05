@@ -16,7 +16,7 @@
     />
     <link
       rel="icon"
-      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230066cc'/%3E%3Cpath d='M9 8h9l5 5v11a3 3 0 0 1-3 3h-11a3 3 0 0 1-3-3V11a3 3 0 0 1 3-3z' fill='%23fff'/%3E%3C/svg%3E"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230066cc'/%3E%3Crect x='4' y='5' width='10' height='22' rx='2.5' fill='%23fff'/%3E%3Cpath d='M18 5.5 27.5 8.8v14.4L18 26.5Z' fill='%23fff'/%3E%3C/svg%3E"
     />
   </head>
   <body class="bg-white text-ink antialiased">
@@ -25,8 +25,21 @@
       <nav
         class="mx-auto flex h-full max-w-[1440px] items-center gap-5 overflow-x-auto px-5 text-nav text-white/90"
       >
-        <a href="#/" class="flex items-center gap-2 font-semibold text-white">
-          <i data-lucide="files" class="size-4"></i>
+        <a href="#/" class="flex shrink-0 items-center gap-2 font-semibold text-white">
+          <!-- brand mark: a sheet beside a page turning away from it -->
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.8"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            class="size-4"
+            aria-hidden="true"
+          >
+            <rect x="3.6" y="4.6" width="7" height="14.8" rx="1.8" />
+            <path d="M13.4 5.2 20.4 7.4v9.2l-7 2.2Z" />
+          </svg>
           PDF Toolkit
         </a>
         <a href="#/merge" class="shrink-0 transition-opacity hover:opacity-70">Gabungkan</a>

@@ -16,6 +16,7 @@ import { attachThumbnails } from '../lib/pagegrid.js';
 import { createFileLoader } from '../lib/loader.js';
 import { zipStore } from '../lib/zip.js';
 import { subNavMarkup } from '../lib/nav.js';
+import { brandIcon } from '../lib/icons.js';
 
 /** Turns [1,2,3,5] into "1-3, 5", collapsing only ascending runs. */
 function compressRanges(pages) {
@@ -138,7 +139,7 @@ export function renderSplit() {
             <div data-status></div>
 
             <button type="button" data-split class="${cls.pillPrimary}">
-              <i data-lucide="scissors" class="size-[18px]"></i>
+              ${brandIcon('split', 'size-[18px]')}
               Pisahkan PDF
             </button>
           </div>

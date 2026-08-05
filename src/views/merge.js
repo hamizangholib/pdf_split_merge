@@ -17,6 +17,7 @@ import { mergePdfs } from '../lib/pdf.js';
 import { coverThumbnail } from '../lib/preview.js';
 import { attachDragReorder } from '../lib/pagegrid.js';
 import { subNavMarkup } from '../lib/nav.js';
+import { brandIcon } from '../lib/icons.js';
 
 export function renderMerge() {
   /** @type {{ files: File[], status: string|null, message: string, busy: boolean }} */
@@ -47,7 +48,7 @@ export function renderMerge() {
 
         <div class="flex flex-wrap items-center gap-4">
           <button type="button" data-merge class="${cls.pillPrimary}" disabled>
-            <i data-lucide="combine" class="size-[18px]"></i>
+            ${brandIcon('merge', 'size-[18px]')}
             Gabungkan PDF
           </button>
           <button type="button" data-clear class="${cls.pillGhost}" style="display: none">

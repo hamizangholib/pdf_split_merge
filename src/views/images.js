@@ -15,6 +15,7 @@ import {
 import { imagesToPdf } from '../lib/image.js';
 import { attachDragReorder } from '../lib/pagegrid.js';
 import { subNavMarkup } from '../lib/nav.js';
+import { brandIcon } from '../lib/icons.js';
 
 export function renderImages() {
   /** @type {{ files: File[], status: string|null, message: string, busy: boolean }} */
@@ -94,7 +95,7 @@ export function renderImages() {
 
         <div class="flex flex-wrap items-center gap-4">
           <button type="button" data-build class="${cls.pillPrimary}" disabled>
-            <i data-lucide="file-text" class="size-[18px]"></i>
+            ${brandIcon('images', 'size-[18px]')}
             Buat PDF
           </button>
           <button type="button" data-clear class="${cls.pillGhost}" style="display: none">

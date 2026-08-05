@@ -15,6 +15,7 @@ import { openPreview } from '../lib/preview.js';
 import { attachDragReorder, attachThumbnails } from '../lib/pagegrid.js';
 import { createFileLoader } from '../lib/loader.js';
 import { subNavMarkup } from '../lib/nav.js';
+import { brandIcon } from '../lib/icons.js';
 
 export function renderOrganize() {
   /**
@@ -85,7 +86,7 @@ export function renderOrganize() {
           <div data-status></div>
 
           <button type="button" data-save class="${cls.pillPrimary}">
-            <i data-lucide="save" class="size-[18px]"></i>
+            ${brandIcon('organize', 'size-[18px]')}
             Simpan PDF
           </button>
         </div>

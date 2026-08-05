@@ -1,5 +1,6 @@
 import { html, cls } from '../lib/ui.js';
 import { tools } from '../lib/nav.js';
+import { brandIcon } from '../lib/icons.js';
 
 /**
  * The landing surface: a greeting, then the single decision the visitor has to
@@ -39,7 +40,7 @@ export function renderWelcome() {
                 <span class="flex size-20 items-center justify-center rounded-lg shadow-product ${
                   dark ? 'bg-tile-2 text-action-dark' : 'bg-white text-action'
                 }">
-                  <i data-lucide="${tool.icon}" class="size-9"></i>
+                  ${brandIcon(tool.icon, 'size-9')}
                 </span>
                 <h2 class="text-display-md ${dark ? 'text-white' : 'text-ink'}">${tool.title}</h2>
                 <p class="max-w-[380px] text-body ${dark ? 'text-muted-dark' : 'text-ink-80'}">
