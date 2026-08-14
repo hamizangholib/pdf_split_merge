@@ -37,6 +37,11 @@ Seluruh proses pengolahan dilakukan **100% secara lokal di browser Anda** menggu
 - 🗜️ **Perkecil Ukuran PDF (Compress)**:
   - Optimalkan dan kurangi ukuran berkas PDF secara efisien.
   - Teks tetap dapat dicari/diseleksi dan formulir PDF tetap berfungsi (tanpa meraster teks menjadi gambar).
+- 📲 **PWA & Offline**:
+  - Dapat dipasang di HP maupun desktop, lalu berjalan penuh tanpa koneksi internet.
+  - Service worker mem-precache seluruh aset termasuk worker PDF.js.
+- ⚡ **Muat Cepat (Code Splitting)**:
+  - Bundel awal hanya ~30 kB; `pdf-lib` (~410 kB) dan `pdf.js` (~420 kB) diunduh saat alatnya dibuka.
 - 🎨 **Antarmuka Modern & Responsif**:
   - Desain elegan bergaya *Chain App Dev* dengan tema warna biru modern.
   - Kartu berbayangan lembut, animasi *scroll-reveal*, preloader halus, serta dukungan area *Drag & Drop*.
@@ -52,6 +57,7 @@ Seluruh proses pengolahan dilakukan **100% secara lokal di browser Anda** menggu
 - **PDF Rendering**: [pdfjs-dist](https://mozilla.github.io/pdf.js/) *(Render thumbnail & visual pratinjau halaman)*
 - **Markdown Parser**: [marked](https://marked.js.org/) *(Parser Markdown/GFM)*
 - **Icons**: [Lucide Icons](https://lucide.dev/) *(Sistem ikon UI)*
+- **PWA**: [vite-plugin-pwa](https://vite-pwa-org.netlify.app/) *(Manifest, service worker, precache offline)*
 
 ---
 
@@ -85,6 +91,17 @@ Pastikan Anda sudah menginstall [Node.js](https://nodejs.org/) (versi 18 ke atas
    ```bash
    npm run preview
    ```
+   Service worker hanya aktif pada hasil build, jadi uji PWA/offline lewat `npm run preview`, bukan `npm run dev`.
+
+5. **Perintah lain**:
+   ```bash
+   npm run selfcheck
+   ```
+   Menjalankan pemeriksaan mandiri untuk penulis ZIP dan pipeline Markdown (parser, sanitizer, penebak judul).
+   ```bash
+   npm run icons
+   ```
+   Membuat ulang ikon PWA, ikon Apple, dan kartu Open Graph di `public/` dari geometri logo. Jalankan setelah mengubah warna merek.
 
 ---
 
@@ -108,6 +125,9 @@ Proyek ini telah dilengkapi dengan workflow CI/CD via **GitHub Actions** (`.gith
 pdf-toolkit/
 ├── .github/
 │   └── workflows/          # GitHub Actions workflow untuk deployment otomatis
+├── public/                 # Ikon PWA, apple-touch-icon, kartu Open Graph (dibuat oleh npm run icons)
+├── scripts/
+│   └── make-icons.mjs      # Perender logo ke PNG (tanpa dependensi gambar)
 ├── src/
 │   ├── lib/                # Core utility modules & helpers
 │   │   ├── compress.js     # Algoritma kompresi & optimasi PDF
@@ -130,7 +150,7 @@ pdf-toolkit/
 │   │   ├── images.js       # Fitur konversi Gambar ke PDF
 │   │   ├── markdown.js     # Fitur konversi Markdown ke PDF
 │   │   └── compress.js     # Fitur kompresi PDF
-│   ├── main.js             # Hash router SPA, scroll header handler & entry point
+│   ├── main.js             # Hash router SPA (lazy per rute), header scroll, menu mobile, preloader
 │   └── style.css           # Styling utama & Tailwind CSS v4 imports
 ├── index.html              # Shell HTML utama
 ├── vite.config.js          # Konfigurasi Vite bundler

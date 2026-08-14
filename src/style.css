@@ -388,3 +388,34 @@
     transform: translateX(-50%);
   }
 }
+
+/* Mobile navigation panel — collapsed to zero height, opened by #menu-toggle. */
+.mobile-menu {
+  max-height: 0;
+  overflow: hidden;
+  opacity: 0;
+  visibility: hidden;
+  transition:
+    max-height 0.3s ease,
+    opacity 0.25s ease,
+    visibility 0.3s;
+}
+
+.mobile-menu.is-open {
+  max-height: 32rem;
+  opacity: 1;
+  visibility: visible;
+}
+
+/* The toggle carries both glyphs; the open state decides which one shows. */
+.menu-toggle .icon-open {
+  display: none;
+}
+
+.menu-toggle[aria-expanded='true'] .icon-closed {
+  display: none;
+}
+
+.menu-toggle[aria-expanded='true'] .icon-open {
+  display: block;
+}

@@ -10,10 +10,12 @@ import {
   GripVertical,
   Layers,
   LoaderCircle,
+  Menu,
   RotateCw,
   ShieldCheck,
   Trash2,
   Upload,
+  X,
   createIcons,
 } from 'lucide';
 
@@ -32,10 +34,12 @@ const usedIcons = {
   GripVertical,
   Layers,
   LoaderCircle,
+  Menu,
   RotateCw,
   ShieldCheck,
   Trash2,
   Upload,
+  X,
 };
 
 /** Replaces every [data-lucide] placeholder inside `root` with its SVG. */

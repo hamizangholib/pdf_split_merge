@@ -6,7 +6,9 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "icons": "node scripts/make-icons.mjs",
+    "selfcheck": "node src/lib/zip.selfcheck.mjs && node src/lib/markdown.selfcheck.mjs"
   },
   "dependencies": {
     "lucide": "^1.28.0",
@@ -17,6 +19,7 @@
   "devDependencies": {
     "@tailwindcss/vite": "^4.3.3",
     "tailwindcss": "^4.3.3",
-    "vite": "^8.2.0"
+    "vite": "^8.2.0",
+    "vite-plugin-pwa": "^1.3.0"
   }
 }
