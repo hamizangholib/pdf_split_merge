@@ -4,6 +4,7 @@ import { revealOnScroll } from './lib/reveal.js';
 import { renderWelcome } from './views/welcome.js';
 import { base, pathOf, routeBySlug, slugOf } from './lib/nav.js';
 import { legacyHashes, site } from './lib/routes.js';
+import { warmUp } from './lib/pdf.js';
 
 const app = document.querySelector('#app');
 
@@ -97,6 +98,12 @@ async function route() {
     heading.setAttribute('tabindex', '-1');
     heading.focus({ preventScroll: true });
   }
+
+  // Every tool's first move is to hand a file to the worker, so it is started
+  // here — but only once the browser has nothing better to do.
+  if (match.key !== 'home') {
+    (window.requestIdleCallback ?? ((run) => setTimeout(run, 400)))(warmUp);
+  }
 }
 
 /** Navigates without a page load, leaving a real entry in the back button. */
@@ -130,12 +137,46 @@ paintIcons(document.body);
 
 window.addEventListener('popstate', route);
 
-// Links shared before the site moved to real paths still arrive as "#/merge".
-const legacy = legacyHashes[window.location.hash];
-if (legacy !== undefined) {
-  window.history.replaceState(null, '', pathOf(legacy));
+/* ---------------------------------------------------------- legacy hashes */
+
+/**
+ * The slug an old hash URL was asking for, or undefined if this hash is not one
+ * of ours to touch.
+ *
+ * Only fragments that look like the old routes ("#/merge") count — the skip
+ * link's "#app" and any other in-page anchor must keep working. A trailing
+ * slash is tolerated, and a hash that follows the old shape but names nothing
+ * we recognise goes to the home page rather than being left in the address bar
+ * pointing at nothing.
+ */
+function legacySlug(hash) {
+  if (!hash.startsWith('#/')) return undefined;
+  return legacyHashes[hash.replace(/\/+$/, '')] ?? '';
 }
 
+/**
+ * Moves an old hash URL onto its real path.
+ *
+ * A fragment never reaches the server, so GitHub Pages cannot redirect these —
+ * the only place a link someone bookmarked or shared before the move can be
+ * rescued is here, in the page it lands on. `replaceState` rather than
+ * `pushState`: the old address should not become a back-button stop.
+ */
+function redirectLegacyHash() {
+  const slug = legacySlug(window.location.hash);
+  if (slug === undefined) return false;
+
+  window.history.replaceState(null, '', pathOf(slug));
+  return true;
+}
+
+// An old link pasted into a tab that already has the site open changes only the
+// fragment, so it arrives here rather than as a fresh page load.
+window.addEventListener('hashchange', () => {
+  if (redirectLegacyHash()) route();
+});
+
+redirectLegacyHash();
 route();
 
 /* ------------------------------------------------------------------ header */

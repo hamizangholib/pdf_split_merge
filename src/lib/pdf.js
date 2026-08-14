@@ -66,6 +66,16 @@ function run(op, payload, { transfer = [], onProgress } = {}) {
 /* -------------------------------------------------------------- public API */
 
 /**
+ * Starts the worker before anything needs it.
+ *
+ * Otherwise the first thing a visitor does — picking a file — pays for
+ * creating the thread and parsing pdf-lib on top of reading their document.
+ * The script is already in the service worker's cache by then, so this costs
+ * no extra network.
+ */
+export const warmUp = () => void ensureWorker();
+
+/**
  * Validates a file and returns a handle for the tools to work against.
  *
  * `bytes` is handed to the worker rather than copied, so the caller must not

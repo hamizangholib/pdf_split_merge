@@ -1,4 +1,4 @@
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { defineConfig } from 'vite';
 import tailwindcss from '@tailwindcss/vite';
@@ -44,6 +44,26 @@ function skeleton(route) {
       </section>`;
 }
 
+/**
+ * Tags that start a download the browser would otherwise only discover later.
+ *
+ * Fonts sit behind the stylesheet — the browser cannot know it needs them until
+ * the CSS is parsed — and a tool's own chunk sits behind the entry script,
+ * which has to download and run before its dynamic import fires. On a real
+ * connection each of those is a whole round trip added to the wait.
+ */
+function preloadTags(fonts, chunks) {
+  const font = (file) =>
+    `    <link rel="preload" as="font" type="font/woff2" crossorigin href="${base}${file}" />`;
+  const script = (file) => `    <link rel="modulepreload" href="${base}${file}" />`;
+
+  return [
+    // The two weights every page uses for body text and headings.
+    ...fonts.filter((file) => /roboto-(400|700)-/.test(file)).map(font),
+    ...chunks.map(script),
+  ].join('\n');
+}
+
 /** Per-route metadata swapped into the built shell. */
 function pageHtml(shell, route) {
   const url = urlOf(route.slug);
@@ -87,6 +107,9 @@ function pageHtml(shell, route) {
  */
 function seoPages() {
   let outDir;
+  /** Font file names, and each view chunk with everything it statically needs. */
+  let fonts = [];
+  let chunksByView = {};
 
   return {
     name: 'seo-pages',
@@ -94,14 +117,54 @@ function seoPages() {
     configResolved(config) {
       outDir = config.build.outDir;
     },
+    generateBundle(_options, bundle) {
+      const entry = Object.entries(bundle).find(
+        ([, item]) => item.type === 'chunk' && item.isEntry,
+      )?.[0];
+
+      // Everything a view needs on top of the entry, followed one import deep at
+      // a time until nothing new turns up.
+      const reach = (start) => {
+        const seen = new Set();
+        const queue = [start];
+        while (queue.length) {
+          const file = queue.shift();
+          if (seen.has(file) || file === entry) continue;
+          seen.add(file);
+          queue.push(...(bundle[file]?.imports ?? []));
+        }
+        return [...seen];
+      };
+
+      chunksByView = {};
+      for (const [file, item] of Object.entries(bundle)) {
+        if (item.type === 'chunk' && !item.isEntry && item.name) {
+          chunksByView[item.name] = reach(file);
+        }
+      }
+    },
     async closeBundle() {
-      const shell = await readFile(join(outDir, 'index.html'), 'utf8');
+      // Read off disk rather than out of the bundle: the fonts are emitted by
+      // the CSS pipeline, which does not always land before `generateBundle`.
+      fonts = (await readdir(join(outDir, 'assets')))
+        .filter((file) => file.endsWith('.woff2'))
+        .map((file) => `assets/${file}`);
+
+      let shell = await readFile(join(outDir, 'index.html'), 'utf8');
+      const insert = (html, tags) => html.replace('</head>', `${tags}\n  </head>`);
+
+      // The home view lives in the entry chunk, so it only needs its fonts.
+      shell = insert(shell, preloadTags(fonts, []));
+      await writeFile(join(outDir, 'index.html'), shell);
 
       for (const route of routes) {
         if (!route.slug) continue;
         const directory = join(outDir, route.slug);
         await mkdir(directory, { recursive: true });
-        await writeFile(join(directory, 'index.html'), pageHtml(shell, route));
+        await writeFile(
+          join(directory, 'index.html'),
+          insert(pageHtml(shell, route), preloadTags([], chunksByView[route.key] ?? [])),
+        );
       }
 
       // GitHub Pages serves this for any path it does not recognise; the router
