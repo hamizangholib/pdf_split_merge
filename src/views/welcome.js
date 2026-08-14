@@ -249,12 +249,15 @@ export function renderWelcome() {
         </div>
       </section>
 
-      <!-- Technology ticker -->
-      <section class="border-t border-hairline bg-parchment py-8">
-        <p class="mb-4 text-center text-fine text-ink-48">Dibangun dengan</p>
+      <!-- Technology ticker. One pass of the list is ~900px wide; the list is
+           repeated six times and the track scrolls by half its width, so half a
+           track (~2700px) still fills an ultrawide screen rather than leaving a
+           gap at one end. -->
+      <section class="border-t border-hairline bg-parchment py-10">
+        <p class="mb-5 text-center text-caption text-ink-48">Dibangun dengan</p>
         <div class="marquee">
           <div class="marquee-track">
-            ${[...stack, ...stack]
+            ${[...stack, ...stack, ...stack, ...stack, ...stack, ...stack]
               .map(
                 (name) =>
                   `<span class="text-tagline font-medium text-ink-48">${name}</span>`,
@@ -271,19 +274,14 @@ export function renderWelcome() {
 }
 
 /**
- * Counts each fact up from zero the first time it scrolls into view. Reduced
- * motion (or a browser without IntersectionObserver) simply keeps the final
- * number, which is already in the markup.
+ * Counts each fact up from zero the first time it scrolls into view. A browser
+ * without IntersectionObserver simply keeps the final number, which is already
+ * in the markup.
  */
 function attachCounters(root) {
   const numbers = [...root.querySelectorAll('[data-count]')];
 
-  if (
-    !('IntersectionObserver' in window) ||
-    window.matchMedia('(prefers-reduced-motion: reduce)').matches
-  ) {
-    return;
-  }
+  if (!('IntersectionObserver' in window)) return;
 
   const observer = new IntersectionObserver(
     (entries) => {
