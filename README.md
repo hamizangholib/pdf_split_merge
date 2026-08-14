@@ -41,10 +41,22 @@ Seluruh proses pengolahan dilakukan **100% secara lokal di browser Anda** menggu
   - Dapat dipasang di HP maupun desktop, lalu berjalan penuh tanpa koneksi internet.
   - Service worker mem-precache seluruh aset termasuk worker PDF.js.
 - ⚡ **Muat Cepat (Code Splitting)**:
-  - Bundel awal hanya ~30 kB; `pdf-lib` (~410 kB) dan `pdf.js` (~420 kB) diunduh saat alatnya dibuka.
+  - Bundel awal hanya ~35 kB (12 kB gzip); `pdf-lib` (~428 kB) dan `pdf.js` (~420 kB) diunduh saat alatnya dibuka.
+  - Roboto dilayani dari origin sendiri — tanpa permintaan ke Google Fonts, tanpa stylesheet eksternal yang memblokir render.
+- 🧵 **Tidak Membekukan Tab**:
+  - Seluruh pekerjaan `pdf-lib` berjalan di Web Worker, jadi antarmuka tetap responsif walau file besar sedang diproses.
+  - Pada uji 15,8 MB / 8 gambar, jeda terpanjang di main thread turun dari 405 ms menjadi 13 ms.
+- 🔎 **Satu URL per Alat**:
+  - `/gabungkan-pdf/`, `/pisahkan-pdf/`, dan seterusnya — masing-masing punya judul, deskripsi, dan `canonical` sendiri, serta HTML yang sudah terisi saat dibuka mesin pencari.
+  - Tautan lama berbentuk `#/merge` otomatis diarahkan ke alamat barunya.
 - 🎨 **Antarmuka Modern & Responsif**:
   - Desain elegan bergaya *Chain App Dev* dengan tema warna biru modern.
   - Kartu berbayangan lembut, animasi *scroll-reveal*, preloader halus, serta dukungan area *Drag & Drop*.
+  - Kartu halaman bergeser ke posisi barunya saat diurutkan ulang, halaman yang dihapus menciut lebih dulu, dan halaman yang baru terpilih berkedip singkat — gerakan yang menempel pada perubahan isi ini menghormati `prefers-reduced-motion`.
+- ♿ **Bisa Dipakai Tanpa Mouse**:
+  - Tautan "Lompat ke konten", fokus berpindah ke judul tiap ganti halaman, dan pengumuman rute untuk pembaca layar.
+  - Urutan halaman bisa diubah lewat tombol panah (bukan hanya tarik-lepas, yang tidak berfungsi di layar sentuh), dengan Undo dan Ctrl + Z.
+  - Berkas juga bisa ditempel dengan Ctrl + V.
 
 ---
 
@@ -129,17 +141,21 @@ pdf-toolkit/
 ├── scripts/
 │   └── make-icons.mjs      # Perender logo ke PNG (tanpa dependensi gambar)
 ├── src/
+│   ├── fonts/              # Roboto (subset Latin, woff2) — dilayani dari origin sendiri
 │   ├── lib/                # Core utility modules & helpers
-│   │   ├── compress.js     # Algoritma kompresi & optimasi PDF
+│   │   ├── compress.js     # Algoritma kompresi & optimasi PDF (bebas DOM)
 │   │   ├── icons.js        # Helper & renderer ikon Lucide
 │   │   ├── image.js        # Konversi gambar ke PDF & pemrosesan gambar
 │   │   ├── loader.js       # Manager uploader berkas & dropzone UI
 │   │   ├── markdown.js     # Parser Markdown, HTML sanitizer & mesin cetak PDF
-│   │   ├── nav.js          # Sub-navigasi antar fitur PDF
+│   │   ├── nav.js          # Path rute, sub-navigasi antar fitur PDF
 │   │   ├── pagegrid.js     # Pratinjau grid halaman & drag-reorder handler
-│   │   ├── pdf.js          # Pengolah PDF utama (Merge, Split, Extract, Organize)
+│   │   ├── pdf.js          # Klien worker + parser rentang halaman
+│   │   ├── pdfops.js       # Operasi pdf-lib (merge, extract, arrange, compress)
+│   │   ├── pdfops.worker.js# Web Worker yang menjalankan pdfops.js
 │   │   ├── preview.js      # PDF.js page renderer untuk thumbnail
 │   │   ├── reveal.js       # Animasi scroll-reveal (IntersectionObserver)
+│   │   ├── routes.js       # Sumber tunggal daftar rute, judul & deskripsi SEO
 │   │   ├── ui.js           # Utility DOM, format bytes & helper antarmuka
 │   │   └── zip.js          # Generator file ZIP client-side
 │   ├── views/              # Tampilan halaman / modul view SPA
@@ -150,10 +166,10 @@ pdf-toolkit/
 │   │   ├── images.js       # Fitur konversi Gambar ke PDF
 │   │   ├── markdown.js     # Fitur konversi Markdown ke PDF
 │   │   └── compress.js     # Fitur kompresi PDF
-│   ├── main.js             # Hash router SPA (lazy per rute), header scroll, menu mobile, preloader
-│   └── style.css           # Styling utama & Tailwind CSS v4 imports
+│   ├── main.js             # Router path SPA (lazy per rute), metadata per halaman, header scroll, menu mobile, preloader
+│   └── style.css           # @font-face Roboto, styling utama & Tailwind CSS v4 imports
 ├── index.html              # Shell HTML utama
-├── vite.config.js          # Konfigurasi Vite bundler
+├── vite.config.js          # Konfigurasi Vite + prerender halaman per rute, sitemap.xml, robots.txt
 ├── package.json            # Dependensi & script proyek
 └── README.md               # Dokumentasi proyek
 ```

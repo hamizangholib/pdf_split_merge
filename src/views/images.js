@@ -5,15 +5,19 @@ import {
   dropzoneMarkup,
   errorText,
   escapeHtml,
+  fileKey,
   formatBytes,
   html,
   keepImages,
   paintIcons,
+  paintStatus,
+  resultLink,
   setVisible,
-  statusMarkup,
 } from '../lib/ui.js';
-import { imagesToPdf } from '../lib/image.js';
+import { imageKind, reencodeAsJpeg } from '../lib/image.js';
+import { abortImages, addImage, buildImages, startImages } from '../lib/pdf.js';
 import { attachDragReorder } from '../lib/pagegrid.js';
+import { captureRects, collapseOut, playFlip } from '../lib/motion.js';
 import { subNavMarkup } from '../lib/nav.js';
 import { brandIcon } from '../lib/icons.js';
 
@@ -26,7 +30,7 @@ export function renderImages() {
 
   const root = html(`
     <div>
-      ${subNavMarkup('#/images')}
+      ${subNavMarkup('gambar-ke-pdf')}
 
       <section class="mx-auto max-w-[1120px] space-y-8 px-5 py-16">
         <header class="space-y-3">
@@ -138,6 +142,7 @@ export function renderImages() {
       <li
         draggable="true"
         data-index="${index}"
+        data-key="${fileKey(file)}"
         class="relative flex cursor-grab flex-col gap-3 rounded-lg border border-hairline bg-white p-3 active:cursor-grabbing"
       >
         <span class="absolute left-5 top-5 z-10 flex size-6 items-center justify-center rounded-full bg-action text-fine font-semibold text-white">
@@ -169,9 +174,15 @@ export function renderImages() {
 
     card.querySelector('[data-up]').addEventListener('click', () => move(index, index - 1));
     card.querySelector('[data-down]').addEventListener('click', () => move(index, index + 1));
-    card.querySelector('[data-remove]').addEventListener('click', () => {
-      forget(state.files[index]);
-      state.files.splice(index, 1);
+    card.querySelector('[data-remove]').addEventListener('click', async () => {
+      await collapseOut(card);
+      // The list may have been rebuilt while the card was shrinking, so the
+      // file itself says where it now lives — `index` could be stale.
+      const at = state.files.indexOf(file);
+      if (at === -1) return;
+
+      forget(file);
+      state.files.splice(at, 1);
       state.status = null;
       renderList();
     });
@@ -187,6 +198,8 @@ export function renderImages() {
   }
 
   function renderList() {
+    // Card positions before the wipe, so a reorder reads as movement.
+    const rects = captureRects(listHost);
     listHost.innerHTML = '';
 
     if (state.files.length) {
@@ -209,19 +222,16 @@ export function renderImages() {
     buildButton.disabled = state.busy || state.files.length === 0;
     setVisible(clearButton, state.files.length > 0);
     setVisible(optionsHost, state.files.length > 0);
-    renderStatus();
+    paintStatus(statusHost, state.status, state.message);
     paintIcons(root);
-  }
-
-  function renderStatus() {
-    statusHost.innerHTML = statusMarkup(state.status, state.message);
-    paintIcons(statusHost);
+    // Last, so the icons have already taken their final size.
+    playFlip(listHost, rects);
   }
 
   function setStatus(status, message) {
     state.status = status;
     state.message = message;
-    renderStatus();
+    paintStatus(statusHost, status, message);
   }
 
   /** Puts a red outline on the cards whose files could not be converted. */
@@ -267,36 +277,82 @@ export function renderImages() {
     renderList();
   });
 
+  /**
+   * Hands the images to the worker one at a time.
+   *
+   * Each file is offered in its original form first, because embedding
+   * untouched bytes is the only way a clean photo keeps its quality. Only when
+   * the worker says it cannot parse them is the file redrawn through a canvas
+   * here — that repair needs the browser's decoders, which the worker does not
+   * have. A file that fails both ways is reported and skipped rather than
+   * taking the whole batch down with it.
+   */
+  async function convert() {
+    const { imagesId } = await startImages();
+    const skipped = [];
+
+    try {
+      for (const [position, file] of state.files.entries()) {
+        setStatus(
+          'working',
+          `Menyiapkan gambar ${position + 1} dari ${state.files.length}: "${escapeHtml(file.name)}"…`,
+        );
+
+        const kind = imageKind(file);
+        let result = { needsReencode: true };
+        if (kind !== 'other') {
+          result = await addImage(imagesId, new Uint8Array(await file.arrayBuffer()), kind);
+        }
+        if (result.ok) continue;
+
+        if (!result.needsReencode) {
+          skipped.push({ file, reason: 'Gagal dibaca.' });
+          continue;
+        }
+
+        try {
+          result = await addImage(imagesId, await reencodeAsJpeg(file), 'reencoded');
+          if (!result.ok) throw new Error('Gagal dibaca.');
+        } catch (error) {
+          skipped.push({ file, reason: error?.message ?? 'Gagal dibaca.' });
+        }
+      }
+
+      const bytes = await buildImages(imagesId, {
+        pageSize: currentPageSize(),
+        margin: Number(marginSelect.value),
+      });
+      return { bytes, skipped };
+    } catch (error) {
+      abortImages(imagesId);
+      // Every image failing is the one case worth reporting as the failure
+      // itself rather than as a pile of warnings.
+      if (skipped.length === state.files.length && skipped.length > 0) {
+        throw new Error(
+          skipped.length === 1
+            ? skipped[0].reason
+            : `Tidak ada gambar yang bisa dikonversi. ${skipped.length} file gagal dibaca.`,
+        );
+      }
+      throw error;
+    }
+  }
+
   buildButton.addEventListener('click', async () => {
     state.busy = true;
     buildButton.disabled = true;
 
     try {
-      const { bytes, skipped } = await imagesToPdf(
-        state.files,
-        {
-          pageSize: currentPageSize(),
-          margin: Number(marginSelect.value),
-        },
-        async (position, file) => {
-          setStatus(
-            'working',
-            `Menyiapkan gambar ${position + 1} dari ${state.files.length}: "${escapeHtml(file.name)}"…`,
-          );
-          // Yield so the progress line paints between images.
-          await new Promise((resolve) => setTimeout(resolve));
-        },
-      );
-
-      downloadBytes(bytes, 'gambar.pdf');
+      const { bytes, skipped } = await convert();
+      const url = downloadBytes(bytes, 'gambar.pdf', 'application/pdf', { keep: true });
 
       const converted = state.files.length - skipped.length;
       const skippedNames = skipped.map((entry) => `"${escapeHtml(entry.file.name)}"`).join(', ');
       setStatus(
         skipped.length ? 'warning' : 'success',
-        skipped.length
+        (skipped.length
           ? `${converted} gambar disimpan sebagai "gambar.pdf". ${skipped.length} dilewati karena tidak bisa dibaca: ${skippedNames}.`
-          : `Selesai. ${converted} gambar disimpan sebagai "gambar.pdf".`,
+          : `Selesai. ${converted} gambar disimpan sebagai "gambar.pdf".`) + resultLink(url),
       );
       markSkipped(skipped);
     } catch (error) {

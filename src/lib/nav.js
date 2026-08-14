@@ -1,66 +1,36 @@
 import { cls } from './ui.js';
+import { routes, routeBySlug, tools } from './routes.js';
 
-/** Every tool, in the order they appear in the header and on the home page. */
-export const tools = [
-  {
-    hash: '#/merge',
-    label: 'Gabungkan',
-    title: 'Gabungkan PDF',
-    icon: 'merge',
-    blurb: 'Satukan beberapa file PDF menjadi satu dokumen, dengan urutan yang Anda tentukan.',
-  },
-  {
-    hash: '#/split',
-    label: 'Pisahkan',
-    title: 'Pisahkan PDF',
-    icon: 'split',
-    blurb: 'Ambil halaman tertentu — misalnya 1-3, 5, 7-10 — sebagai satu file atau arsip ZIP.',
-  },
-  {
-    hash: '#/organize',
-    label: 'Atur Halaman',
-    title: 'Atur Halaman',
-    icon: 'organize',
-    blurb: 'Tarik untuk mengurutkan ulang, putar halaman yang miring, dan buang yang tidak perlu.',
-  },
-  {
-    hash: '#/images',
-    label: 'Gambar ke PDF',
-    title: 'Gambar ke PDF',
-    icon: 'images',
-    blurb: 'Ubah kumpulan JPG atau PNG menjadi satu PDF, lengkap dengan pengaturan halaman.',
-  },
-  {
-    hash: '#/markdown',
-    label: 'Markdown ke PDF',
-    title: 'Markdown ke PDF',
-    icon: 'markdown',
-    blurb: 'Ubah catatan .md — lengkap dengan tabel, blok kode, dan gambar — menjadi PDF rapi.',
-  },
-  {
-    hash: '#/compress',
-    label: 'Perkecil',
-    title: 'Perkecil PDF',
-    icon: 'compress',
-    blurb: 'Kurangi ukuran file tanpa mengubah halaman menjadi gambar — teks tetap utuh.',
-  },
-];
+export { routes, routeBySlug, tools };
+
+/** Where the site is mounted — "/" in dev, "/pdf_split_merge/" on Pages. */
+export const base = import.meta.env.BASE_URL;
+
+/** The URL for a route slug. Trailing slash included: it is the directory the
+ *  build writes each pre-rendered page into, so linking to it skips a redirect. */
+export const pathOf = (slug) => `${base}${slug ? `${slug}/` : ''}`;
+
+/** The slug a browser path points at, with the mount point and slashes removed. */
+export function slugOf(pathname) {
+  const rest = pathname.startsWith(base) ? pathname.slice(base.length) : pathname;
+  return rest.replace(/^\/+|\/+$/g, '');
+}
 
 /** The frosted sub-navigation every tool page carries. */
-export function subNavMarkup(currentHash) {
-  const current = tools.find((tool) => tool.hash === currentHash);
+export function subNavMarkup(currentSlug) {
+  const current = routeBySlug(currentSlug);
   const others = tools
-    .filter((tool) => tool.hash !== currentHash)
+    .filter((tool) => tool.slug !== currentSlug)
     .map(
       (tool) =>
-        `<a href="${tool.hash}" class="shrink-0 text-caption ${cls.link}">${tool.label}</a>`,
+        `<a href="${pathOf(tool.slug)}" class="shrink-0 text-caption ${cls.link}">${tool.label}</a>`,
     )
     .join('');
 
   return `
     <div class="sticky top-20 z-40 border-b border-hairline bg-white/85 backdrop-blur-xl backdrop-saturate-150">
       <div class="mx-auto flex h-[56px] max-w-[1200px] items-center gap-4 overflow-x-auto px-5">
-        <a href="#/" class="flex shrink-0 items-center gap-1.5 text-caption ${cls.link}">
+        <a href="${pathOf('')}" class="flex shrink-0 items-center gap-1.5 text-caption ${cls.link}">
           <i data-lucide="arrow-left" class="size-4"></i>
           Beranda
         </a>

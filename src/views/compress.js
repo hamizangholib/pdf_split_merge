@@ -6,23 +6,23 @@ import {
   formatBytes,
   html,
   paintIcons,
+  paintStatus,
+  resultLink,
   setVisible,
-  statusMarkup,
   stripPdfExtension,
 } from '../lib/ui.js';
-import { loadDocument } from '../lib/pdf.js';
-import { compressPdf } from '../lib/compress.js';
+import { closeDocument, compressDocument, openDocument } from '../lib/pdf.js';
 import { createFileLoader } from '../lib/loader.js';
 import { subNavMarkup } from '../lib/nav.js';
 import { brandIcon } from '../lib/icons.js';
 
 export function renderCompress() {
-  /** @type {{ file: File|null, bytes: Uint8Array|null, pageCount: number, status: string|null, message: string, busy: boolean }} */
-  const state = { file: null, bytes: null, pageCount: 0, status: null, message: '', busy: false };
+  /** @type {{ file: File|null, docId: number|null, pageCount: number, status: string|null, message: string, busy: boolean }} */
+  const state = { file: null, docId: null, pageCount: 0, status: null, message: '', busy: false };
 
   const root = html(`
     <div>
-      ${subNavMarkup('#/compress')}
+      ${subNavMarkup('perkecil-pdf')}
 
       <section class="mx-auto max-w-[820px] space-y-8 px-5 py-16">
         <header class="space-y-3">
@@ -101,13 +101,13 @@ export function renderCompress() {
   function setStatus(status, message) {
     state.status = status;
     state.message = message;
-    statusHost.innerHTML = statusMarkup(status, message);
-    paintIcons(statusHost);
+    paintStatus(statusHost, status, message);
   }
 
   function clearDocument() {
+    closeDocument(state.docId);
     state.file = null;
-    state.bytes = null;
+    state.docId = null;
     state.pageCount = 0;
     setVisible(detailHost, false);
     setStatus(null, '');
@@ -117,12 +117,12 @@ export function renderCompress() {
     id: 'compress',
     onReset: clearDocument,
     onReady: async (file, bytes) => {
-      const doc = await loadDocument(file, bytes);
+      // The worker keeps the untouched original, so every run starts from the
+      // same bytes rather than from an already-compressed document.
+      const { docId, pageCount } = await openDocument(bytes, file.name);
       state.file = file;
-      // Kept so every run starts from the untouched original rather than from
-      // an already-compressed document.
-      state.bytes = bytes;
-      state.pageCount = doc.getPageCount();
+      state.docId = docId;
+      state.pageCount = pageCount;
 
       nameHost.textContent = file.name;
       metaHost.textContent = `${state.pageCount} halaman · ${formatBytes(file.size)}`;
@@ -140,13 +140,10 @@ export function renderCompress() {
 
     try {
       const level = root.querySelector('input[name="level"]:checked').value;
-      const doc = await loadDocument(state.file, state.bytes.slice());
 
-      const { bytes, recoded } = await compressPdf(doc, level, async (position, total) => {
-        setStatus('working', `Mengompresi gambar ${position + 1} dari ${total}…`);
-        // Yield so the progress line paints between images.
-        await new Promise((resolve) => setTimeout(resolve));
-      });
+      const { bytes, recoded } = await compressDocument(state.docId, level, (detail) =>
+        setStatus('working', `Mengompresi gambar ${detail.position + 1} dari ${detail.total}…`),
+      );
 
       const before = state.file.size;
       const saved = before - bytes.length;
@@ -161,12 +158,13 @@ export function renderCompress() {
       }
 
       const filename = `${stripPdfExtension(state.file.name)}-kecil.pdf`;
-      downloadBytes(bytes, filename);
+      const url = downloadBytes(bytes, filename, 'application/pdf', { keep: true });
 
       const detail = recoded ? ` ${recoded} gambar dikompresi ulang.` : '';
       setStatus(
         'success',
-        `${formatBytes(before)} → ${formatBytes(bytes.length)}, hemat ${percent}%.${detail} Disimpan sebagai "${escapeHtml(filename)}".`,
+        `${formatBytes(before)} → ${formatBytes(bytes.length)}, hemat ${percent}%.${detail} Disimpan sebagai "${escapeHtml(filename)}".` +
+          resultLink(url, 'Periksa hasilnya'),
       );
     } catch (error) {
       setStatus('error', escapeHtml(errorText(error)));

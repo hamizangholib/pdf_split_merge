@@ -11,6 +11,7 @@ import {
   setProgress,
   setVisible,
 } from './ui.js';
+import { fadeOut } from './motion.js';
 
 /**
  * The "pick one file" flow every single-document tool needs: a dropzone, a
@@ -66,6 +67,9 @@ export function createFileLoader({
   const retryButton = element.querySelector('[data-retry]');
 
   async function load(file) {
+    // A previous run may have faded this card out and left the fade in place.
+    loadingHost.getAnimations().forEach((animation) => animation.cancel());
+
     // Show the card before any parsing starts, so a slow or broken file never
     // looks like nothing happened.
     setVisible(uploadHost, false);
@@ -82,7 +86,10 @@ export function createFileLoader({
       );
       setProgress(progressHost, 'processing');
       await onReady(file, bytes);
+      // The bar reaches the end, then this card hands over to the tool that
+      // `onReady` has already revealed underneath it.
       setProgress(progressHost, 'ready');
+      await fadeOut(loadingHost);
       setVisible(loadingHost, false);
     } catch (error) {
       onReset?.();

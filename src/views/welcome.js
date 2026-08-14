@@ -1,5 +1,5 @@
 import { html, cls } from '../lib/ui.js';
-import { tools } from '../lib/nav.js';
+import { pathOf, tools } from '../lib/nav.js';
 import { brandIcon } from '../lib/icons.js';
 
 /**
@@ -67,7 +67,7 @@ export function renderWelcome() {
               <i data-lucide="shield-check" class="size-3.5"></i>
               100% diproses di perangkat Anda
             </span>
-            <h1 class="text-display-md text-ink md:text-display-lg lg:text-hero">
+            <h1 tabindex="-1" class="text-display-md text-ink md:text-display-lg lg:text-hero">
               Rapikan PDF Anda,<br />
               <span class="text-brand-gradient">tanpa meninggalkan browser.</span>
             </h1>
@@ -76,11 +76,11 @@ export function renderWelcome() {
               menjadi PDF, lalu perkecil ukurannya. Tidak ada berkas yang diunggah.
             </p>
             <div class="flex flex-wrap items-center gap-4">
-              <a href="#/merge" class="${cls.pillPrimary}">
+              <a href="${pathOf('gabungkan-pdf')}" class="${cls.pillPrimary}">
                 Mulai gabungkan
                 <i data-lucide="chevron-right" class="size-4"></i>
               </a>
-              <a href="#/markdown" class="${cls.pillGhost}">Markdown ke PDF</a>
+              <a href="${pathOf('markdown-ke-pdf')}" class="${cls.pillGhost}">Markdown ke PDF</a>
             </div>
 
             <div class="space-y-2 pt-2">
@@ -138,13 +138,13 @@ export function renderWelcome() {
               .map(
                 (tool) => `
                   <a
-                    href="${tool.hash}"
+                    href="${pathOf(tool.slug)}"
                     class="reveal group flex flex-col gap-4 rounded-md bg-white p-8 shadow-soft transition-transform hover:-translate-y-1.5"
                   >
                     <span class="flex size-14 items-center justify-center rounded-md bg-parchment text-action transition-colors group-hover:bg-brand-gradient group-hover:text-white">
                       ${brandIcon(tool.icon, 'size-7')}
                     </span>
-                    <h3 class="text-tagline font-bold text-ink">${tool.title}</h3>
+                    <h3 class="text-tagline font-bold text-ink">${tool.name}</h3>
                     <p class="text-caption text-ink-80">${tool.blurb}</p>
                     <span class="mt-auto inline-flex items-center gap-1.5 pt-2 text-caption font-medium text-action">
                       Buka

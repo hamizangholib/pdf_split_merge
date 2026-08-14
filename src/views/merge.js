@@ -5,15 +5,21 @@ import {
   dropzoneMarkup,
   errorText,
   escapeHtml,
+  fileKey,
   formatBytes,
   html,
   paintIcons,
+  paintStatus,
   progressMarkup,
+  resultLink,
   setProgress,
   setVisible,
-  statusMarkup,
 } from '../lib/ui.js';
-import { mergePdfs } from '../lib/pdf.js';
+import { abortMerge, addToMerge, finishMerge, startMerge } from '../lib/pdf.js';
+import { captureRects, collapseOut, fadeIn, playFlip } from '../lib/motion.js';
+
+/** Files whose cover has already been on screen once. */
+const coverShown = new WeakSet();
 import { coverThumbnail } from '../lib/preview.js';
 import { attachDragReorder } from '../lib/pagegrid.js';
 import { subNavMarkup } from '../lib/nav.js';
@@ -25,7 +31,7 @@ export function renderMerge() {
 
   const root = html(`
     <div>
-      ${subNavMarkup('#/merge')}
+      ${subNavMarkup('gabungkan-pdf')}
 
       <section class="mx-auto max-w-[1120px] space-y-8 px-5 py-16">
         <header class="space-y-3">
@@ -74,6 +80,7 @@ export function renderMerge() {
       <li
         draggable="true"
         data-index="${index}"
+        data-key="${fileKey(file)}"
         class="relative flex cursor-grab flex-col gap-3 rounded-lg border border-hairline bg-white p-3 active:cursor-grabbing"
       >
         <span class="absolute left-5 top-5 z-10 flex size-6 items-center justify-center rounded-full bg-action text-fine font-semibold text-white">
@@ -118,6 +125,12 @@ export function renderMerge() {
         return;
       }
       thumb.innerHTML = `<img src="${cover.url}" alt="Pratinjau ${escapeHtml(file.name)}" class="h-full w-full object-contain" />`;
+      // The cover is cached per File, so only its first appearance is news;
+      // every later re-render replays it and should not blink.
+      if (!coverShown.has(file)) {
+        coverShown.add(file);
+        fadeIn(thumb.firstElementChild);
+      }
       row.querySelector('[data-meta]').textContent =
         `${cover.pageCount} halaman · ${formatBytes(file.size)}`;
       // Cover and page count are proof enough that the file is ready.
@@ -126,8 +139,14 @@ export function renderMerge() {
 
     row.querySelector('[data-up]').addEventListener('click', () => move(index, index - 1));
     row.querySelector('[data-down]').addEventListener('click', () => move(index, index + 1));
-    row.querySelector('[data-remove]').addEventListener('click', () => {
-      state.files.splice(index, 1);
+    row.querySelector('[data-remove]').addEventListener('click', async () => {
+      await collapseOut(row);
+      // The list may have been rebuilt while the row was shrinking, so the file
+      // itself says where it now lives — `index` could be stale.
+      const at = state.files.indexOf(file);
+      if (at === -1) return;
+
+      state.files.splice(at, 1);
       state.status = null;
       renderList();
     });
@@ -143,6 +162,8 @@ export function renderMerge() {
   }
 
   function renderList() {
+    // Card positions before the wipe, so a reorder reads as movement.
+    const rects = captureRects(listHost);
     listHost.innerHTML = '';
 
     if (state.files.length) {
@@ -164,19 +185,16 @@ export function renderMerge() {
 
     mergeButton.disabled = state.busy || state.files.length < 2;
     setVisible(clearButton, state.files.length > 0);
-    renderStatus();
+    paintStatus(statusHost, state.status, state.message);
     paintIcons(root);
-  }
-
-  function renderStatus() {
-    statusHost.innerHTML = statusMarkup(state.status, state.message);
-    paintIcons(statusHost);
+    // Last, so the icons have already taken their final size.
+    playFlip(listHost, rects);
   }
 
   function setStatus(status, message) {
     state.status = status;
     state.message = message;
-    renderStatus();
+    paintStatus(statusHost, status, message);
   }
 
   /* --------------------------------------------------------------- actions */
@@ -198,22 +216,33 @@ export function renderMerge() {
   });
 
   mergeButton.addEventListener('click', async () => {
+    if (state.files.length < 2) {
+      setStatus('error', 'Pilih minimal dua file PDF untuk digabungkan.');
+      return;
+    }
+
     state.busy = true;
     mergeButton.disabled = true;
     setStatus('working', `Menggabungkan ${state.files.length} file…`);
 
+    // Files go over to the worker one at a time, so a twenty-file merge never
+    // holds twenty files in memory at once.
+    const { mergeId } = await startMerge();
+
     try {
-      const bytes = await mergePdfs(state.files, async (position, file) => {
+      for (const [position, file] of state.files.entries()) {
         setStatus(
           'working',
           `Menggabungkan file ${position + 1} dari ${state.files.length}: "${escapeHtml(file.name)}"…`,
         );
-        // Yield so the progress line paints between files.
-        await new Promise((resolve) => setTimeout(resolve));
-      });
-      downloadBytes(bytes, 'gabungan.pdf');
-      setStatus('success', 'Selesai. File "gabungan.pdf" sedang diunduh.');
+        await addToMerge(mergeId, new Uint8Array(await file.arrayBuffer()), file.name);
+      }
+
+      const bytes = await finishMerge(mergeId);
+      const url = downloadBytes(bytes, 'gabungan.pdf', 'application/pdf', { keep: true });
+      setStatus('success', 'Selesai. File "gabungan.pdf" sedang diunduh.' + resultLink(url));
     } catch (error) {
+      abortMerge(mergeId);
       setStatus('error', escapeHtml(errorText(error)));
     } finally {
       state.busy = false;

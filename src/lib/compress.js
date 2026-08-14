@@ -14,6 +14,25 @@ export const levels = {
 
 const name = (value) => PDFName.of(value);
 
+/**
+ * A canvas that works wherever this module runs. `OffscreenCanvas` is the only
+ * option inside the worker; the DOM branch is the fallback for the browser that
+ * could not create a module worker in the first place.
+ */
+function makeCanvas(width, height) {
+  if (typeof OffscreenCanvas !== 'undefined') return new OffscreenCanvas(width, height);
+
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+  return canvas;
+}
+
+function canvasToJpeg(canvas, quality) {
+  if (canvas.convertToBlob) return canvas.convertToBlob({ type: 'image/jpeg', quality });
+  return new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', quality));
+}
+
 /** True for image XObjects stored as a plain JPEG stream. */
 function isJpegImage(dict) {
   if (dict.get(name('Subtype')) !== name('Image')) return false;
@@ -40,15 +59,16 @@ async function shrinkJpeg(bytes, { maxSide, quality }) {
   }
 
   const scale = Math.min(1, maxSide / Math.max(bitmap.width, bitmap.height));
-  const canvas = document.createElement('canvas');
-  canvas.width = Math.max(Math.round(bitmap.width * scale), 1);
-  canvas.height = Math.max(Math.round(bitmap.height * scale), 1);
+  const canvas = makeCanvas(
+    Math.max(Math.round(bitmap.width * scale), 1),
+    Math.max(Math.round(bitmap.height * scale), 1),
+  );
 
   const context = canvas.getContext('2d');
   context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
   bitmap.close();
 
-  const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', quality));
+  const blob = await canvasToJpeg(canvas, quality);
   if (!blob || blob.size >= bytes.length) return null;
 
   return {

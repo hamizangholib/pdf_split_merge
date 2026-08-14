@@ -6,15 +6,22 @@ import {
   formatBytes,
   html,
   paintIcons,
+  paintStatus,
+  resultLink,
   setVisible,
-  statusMarkup,
   stripPdfExtension,
 } from '../lib/ui.js';
-import { extractPages, loadDocument, parsePageRanges } from '../lib/pdf.js';
+import { pop } from '../lib/motion.js';
+import {
+  closeDocument,
+  extractPages,
+  extractPagesToZip,
+  openDocument,
+  parsePageRanges,
+} from '../lib/pdf.js';
 import { openPreview } from '../lib/preview.js';
 import { attachThumbnails } from '../lib/pagegrid.js';
 import { createFileLoader } from '../lib/loader.js';
-import { zipStore } from '../lib/zip.js';
 import { subNavMarkup } from '../lib/nav.js';
 import { brandIcon } from '../lib/icons.js';
 
@@ -47,10 +54,10 @@ function outputSuffix(indices) {
 }
 
 export function renderSplit() {
-  /** @type {{ file: File|null, doc: any, preview: any, pageCount: number, selection: number[], status: string|null, message: string, busy: boolean }} */
+  /** @type {{ file: File|null, docId: number|null, preview: any, pageCount: number, selection: number[], status: string|null, message: string, busy: boolean }} */
   const state = {
     file: null,
-    doc: null,
+    docId: null,
     preview: null,
     pageCount: 0,
     selection: [],
@@ -64,7 +71,7 @@ export function renderSplit() {
 
   const root = html(`
     <div>
-      ${subNavMarkup('#/split')}
+      ${subNavMarkup('pisahkan-pdf')}
 
       <section class="mx-auto max-w-[1120px] space-y-8 px-5 py-16">
         <header class="space-y-3">
@@ -171,15 +178,10 @@ export function renderSplit() {
   const rangeInput = root.querySelector('#ranges');
   const splitButton = root.querySelector('[data-split]');
 
-  function renderStatus() {
-    statusHost.innerHTML = statusMarkup(state.status, state.message);
-    paintIcons(statusHost);
-  }
-
   function setStatus(status, message) {
     state.status = status;
     state.message = message;
-    renderStatus();
+    paintStatus(statusHost, status, message);
   }
 
   /* ------------------------------------------------------------- page grid */
@@ -216,14 +218,26 @@ export function renderSplit() {
     paintIcons(pagesHost);
   }
 
+  /**
+   * Pages that were selected the last time the grid was painted. A page that
+   * is not in here and is selected now has just arrived, and gets a short pop
+   * so a typed range shows visibly which thumbnails it picked up.
+   */
+  let alreadySelected = new Set();
+
   /** Paints selected/unselected state and the 1-based output position badge. */
   function paintSelection() {
     const position = new Map(state.selection.map((page, index) => [page, index + 1]));
+    // "Select all" on a long document would otherwise pop two hundred cards at
+    // once, which reads as a flicker rather than as feedback.
+    const announce = state.selection.length - alreadySelected.size <= 24;
 
     for (const card of pagesHost.children) {
       const pageNumber = Number(card.dataset.page);
       const order = position.get(pageNumber);
       const selected = order !== undefined;
+
+      if (selected && announce && !alreadySelected.has(pageNumber)) pop(card);
 
       card.setAttribute('aria-pressed', String(selected));
       card.classList.toggle('border-action', selected);
@@ -237,6 +251,8 @@ export function renderSplit() {
       badge.classList.toggle('hidden', !selected);
       badge.classList.toggle('flex', selected);
     }
+
+    alreadySelected = new Set(state.selection);
   }
 
   function togglePage(pageNumber) {
@@ -283,9 +299,10 @@ export function renderSplit() {
     stopThumbnails?.();
     stopThumbnails = null;
     state.preview?.destroy?.();
+    closeDocument(state.docId);
 
     state.file = null;
-    state.doc = null;
+    state.docId = null;
     state.preview = null;
     state.pageCount = 0;
     state.selection = [];
@@ -299,15 +316,15 @@ export function renderSplit() {
     id: 'split',
     onReset: clearDocument,
     onReady: async (file, bytes) => {
-      const doc = await loadDocument(file, bytes);
+      // `bytes` is handed to the worker, not copied, so the preview reads the
+      // file again rather than sharing a buffer that no longer exists here.
+      const { docId, pageCount } = await openDocument(bytes, file.name);
       state.file = file;
-      state.doc = doc;
-      state.pageCount = doc.getPageCount();
+      state.docId = docId;
+      state.pageCount = pageCount;
       state.selection = [];
 
-      if (state.pageCount === 0) throw new Error('Dokumen ini tidak memiliki halaman.');
-
-      state.preview = await openPreview(bytes);
+      state.preview = await openPreview(file);
 
       nameHost.textContent = file.name;
       metaHost.textContent = `${state.pageCount} halaman · ${formatBytes(file.size)}`;
@@ -357,34 +374,39 @@ export function renderSplit() {
       let filename;
 
       if (zipped) {
-        const width = String(state.pageCount).length;
-        const entries = [];
-
-        for (const [position, index] of indices.entries()) {
-          setStatus('working', `Menyiapkan halaman ${position + 1} dari ${indices.length}…`);
-          // Yield so the progress line actually paints between pages.
-          await new Promise((resolve) => setTimeout(resolve));
-          entries.push({
-            name: `${base}-halaman-${String(index + 1).padStart(width, '0')}.pdf`,
-            bytes: await extractPages(state.doc, [index]),
-          });
-        }
-
-        setStatus('working', 'Membungkus arsip ZIP…');
-        bytes = zipStore(entries);
+        setStatus('working', `Menyiapkan ${indices.length} halaman…`);
+        bytes = await extractPagesToZip(
+          state.docId,
+          indices,
+          base,
+          String(state.pageCount).length,
+          (detail) =>
+            setStatus(
+              'working',
+              detail.zipping
+                ? 'Membungkus arsip ZIP…'
+                : `Menyiapkan halaman ${detail.position + 1} dari ${detail.total}…`,
+            ),
+        );
         filename = `${base}-${outputSuffix(indices)}.zip`;
       } else {
         setStatus('working', 'Mengekstrak halaman…');
-        bytes = await extractPages(state.doc, indices);
+        bytes = await extractPages(state.docId, indices);
         filename = `${base}-${outputSuffix(indices)}.pdf`;
       }
 
-      downloadBytes(bytes, filename, zipped ? 'application/zip' : 'application/pdf');
+      // A ZIP has nothing a browser tab can show, so only the single-file
+      // result gets an "open it" link.
+      const url = downloadBytes(bytes, filename, zipped ? 'application/zip' : 'application/pdf', {
+        keep: !zipped,
+      });
+
       setStatus(
         'success',
         zipped
           ? `Selesai. ${indices.length} file PDF dibungkus dalam "${escapeHtml(filename)}".`
-          : `Selesai. ${indices.length} halaman disimpan sebagai "${escapeHtml(filename)}".`,
+          : `Selesai. ${indices.length} halaman disimpan sebagai "${escapeHtml(filename)}".` +
+              resultLink(url),
       );
     } catch (error) {
       setStatus('error', escapeHtml(errorText(error)));

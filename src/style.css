@@ -1,6 +1,52 @@
 @import 'tailwindcss';
 
 /* ---------------------------------------------------------------------------
+   Roboto, served from this origin.
+   Google Fonts cost a DNS lookup, a TLS handshake, and a render-blocking
+   stylesheet on every cold visit — and told Google about every visitor, which
+   is a strange thing for a site whose whole promise is that nothing leaves the
+   device. These are the Latin woff2 subsets from @fontsource/roboto
+   (Apache-2.0), one file per weight the app actually uses. 900 is gone (nothing
+   used it) and 600 is here (font-semibold used it and it was never loaded, so
+   the browser was faking it).
+   --------------------------------------------------------------------------- */
+@font-face {
+  font-family: 'Roboto';
+  font-style: normal;
+  font-weight: 300;
+  font-display: swap;
+  src: url('./fonts/roboto-300.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Roboto';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('./fonts/roboto-400.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Roboto';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url('./fonts/roboto-500.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Roboto';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url('./fonts/roboto-600.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Roboto';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('./fonts/roboto-700.woff2') format('woff2');
+}
+
+/* ---------------------------------------------------------------------------
    Design tokens — mapped from the "Chain App Dev" reference template:
    Roboto, a single blue accent (#4b8ef1), one indigo→cyan gradient reserved
    for primary actions, soft wide shadows instead of hairline borders, and
@@ -135,6 +181,32 @@
     outline: 2px solid var(--color-action-focus);
     outline-offset: 3px;
   }
+
+  /* The route heading is focused after every navigation so a screen reader
+     lands on it, but it is not an interactive control — the focus ring would
+     only be noise. */
+  h1:focus {
+    outline: none;
+  }
+}
+
+/* Off screen until it is tabbed to, then the first thing on the page. */
+.skip-link {
+  position: fixed;
+  top: 0;
+  left: 50%;
+  z-index: 200;
+  translate: -50% -120%;
+  border-radius: 0 0 var(--radius-sm) var(--radius-sm);
+  background: var(--color-action-focus);
+  padding: 0.75rem 1.5rem;
+  font-size: var(--text-caption);
+  color: #fff;
+  transition: translate 0.2s ease;
+}
+
+.skip-link:focus {
+  translate: -50% 0;
 }
 
 /* ---------------------------------------------------------------------------
@@ -389,22 +461,32 @@
   }
 }
 
-/* Mobile navigation panel — collapsed to zero height, opened by #menu-toggle. */
+/* Mobile navigation panel — collapsed to zero height, opened by #menu-toggle.
+   `grid-template-rows` rather than `max-height`: a max-height animation has to
+   guess a ceiling, and the guess was 32rem against a panel roughly half that,
+   so the easing landed early and the last part of the open was a dead pause.
+   0fr → 1fr is the panel's own height, whatever it happens to be. */
 .mobile-menu {
-  max-height: 0;
-  overflow: hidden;
+  display: grid;
+  grid-template-rows: 0fr;
   opacity: 0;
   visibility: hidden;
   transition:
-    max-height 0.3s ease,
+    grid-template-rows 0.3s ease,
     opacity 0.25s ease,
     visibility 0.3s;
 }
 
 .mobile-menu.is-open {
-  max-height: 32rem;
+  grid-template-rows: 1fr;
   opacity: 1;
   visibility: visible;
+}
+
+/* A grid row only collapses if its content agrees to be smaller than itself. */
+.mobile-menu > * {
+  min-height: 0;
+  overflow: hidden;
 }
 
 /* The toggle carries both glyphs; the open state decides which one shows. */

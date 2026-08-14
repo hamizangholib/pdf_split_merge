@@ -18,6 +18,7 @@ import {
   X,
   createIcons,
 } from 'lucide';
+import { riseIn } from './motion.js';
 
 // Only the icons this app actually renders — importing lucide's full `icons`
 // map would ship every icon in the library. The five tool marks and the brand
@@ -88,6 +89,22 @@ export function formatBytes(bytes) {
   return `${value >= 10 || exponent === 0 ? Math.round(value) : value.toFixed(1)} ${units[exponent]}`;
 }
 
+/**
+ * A stable identity for a picked file.
+ *
+ * The lists rebuild themselves from scratch on every change, so a card needs
+ * something that survives the rebuild to be recognised as the same card. Name
+ * and size will not do — the same document can legitimately be added twice —
+ * so identity follows the File object itself.
+ */
+const fileKeys = new WeakMap();
+let nextFileKey = 0;
+
+export function fileKey(file) {
+  if (!fileKeys.has(file)) fileKeys.set(file, `file-${++nextFileKey}`);
+  return fileKeys.get(file);
+}
+
 /** Keeps only real PDFs, so a stray file dropped on the zone is ignored. */
 export function keepPdfs(fileList) {
   return Array.from(fileList).filter(
@@ -112,8 +129,20 @@ export function keepMarkdown(fileList) {
   );
 }
 
-/** Triggers a browser download for the produced bytes. */
-export function downloadBytes(bytes, filename, type = 'application/pdf') {
+/**
+ * The blob behind the most recent result that is still openable. Only one is
+ * kept: the previous one goes the moment a new result replaces it, so a long
+ * session never accumulates finished documents in memory.
+ */
+let lastKeptUrl = null;
+
+/**
+ * Triggers a browser download for the produced bytes and returns its blob URL.
+ *
+ * With `keep`, the URL stays alive so the result can also be opened in a tab —
+ * otherwise it is released a few seconds after the download starts.
+ */
+export function downloadBytes(bytes, filename, type = 'application/pdf', { keep = false } = {}) {
   const url = URL.createObjectURL(new Blob([bytes], { type }));
   const anchor = document.createElement('a');
   anchor.href = url;
@@ -121,8 +150,27 @@ export function downloadBytes(bytes, filename, type = 'application/pdf') {
   document.body.appendChild(anchor);
   anchor.click();
   anchor.remove();
-  // Give the browser a moment to start the download before releasing the blob.
-  setTimeout(() => URL.revokeObjectURL(url), 4000);
+
+  if (keep) {
+    if (lastKeptUrl) URL.revokeObjectURL(lastKeptUrl);
+    lastKeptUrl = url;
+  } else {
+    // Give the browser a moment to start the download before releasing the blob.
+    setTimeout(() => URL.revokeObjectURL(url), 4000);
+  }
+
+  return url;
+}
+
+/**
+ * "Open the result" link for a status message.
+ *
+ * A downloaded file is easy to lose track of — in a folder, behind a download
+ * shelf, or on a phone where the download UI is a notification. This puts the
+ * finished document one click away, in the browser's own viewer.
+ */
+export function resultLink(url, label = 'Lihat hasil') {
+  return ` <a href="${url}" target="_blank" rel="noopener" class="font-medium underline underline-offset-2">${label}</a>`;
 }
 
 /**
@@ -234,6 +282,22 @@ export function attachDropzone(zone, input, onFiles, filter = keepPdfs) {
     if (files.length) onFiles(files);
     input.value = '';
   });
+
+  // Paste anywhere on the page, so a screenshot or a file copied in the file
+  // manager can go straight in. The listener has to sit on the document — a
+  // paste is only delivered to the focused element — so it retires itself once
+  // its zone has been replaced by another view.
+  const onPaste = (event) => {
+    if (!zone.isConnected) {
+      document.removeEventListener('paste', onPaste);
+      return;
+    }
+    const files = filter(event.clipboardData?.files ?? []);
+    if (!files.length) return;
+    event.preventDefault();
+    onFiles(files);
+  };
+  document.addEventListener('paste', onPaste);
 }
 
 /* -------------------------------------------------------------------------
@@ -272,6 +336,7 @@ export function dropzoneMarkup({ id, multiple, title, hint, accept = 'applicatio
         <span class="text-tagline text-ink">${title}</span>
         <span class="max-w-md text-caption text-ink-48">${hint}</span>
         <span class="${cls.pillGhost} pointer-events-none">Pilih file</span>
+        <span class="text-fine text-ink-48">atau tempel dengan Ctrl + V</span>
       </div>
       <input
         id="${id}-input"
@@ -282,6 +347,26 @@ export function dropzoneMarkup({ id, multiple, title, hint, accept = 'applicatio
       />
     </div>
   `;
+}
+
+/**
+ * Paints a status banner into `host`, animating it only when the state itself
+ * changes.
+ *
+ * Every tool used to hard-swap the banner, so "processing" vanished and
+ * "finished" appeared as two unrelated events for one thing happening. The
+ * message can still tick along inside a state (file 3 of 12) without the banner
+ * jumping each time.
+ */
+const bannerState = new WeakMap();
+
+export function paintStatus(host, state, message) {
+  const previous = bannerState.get(host);
+  host.innerHTML = statusMarkup(state, message);
+  paintIcons(host);
+  bannerState.set(host, state);
+
+  if (state && state !== previous) riseIn(host.firstElementChild);
 }
 
 /** Inline status banner: idle | working | success | error. */

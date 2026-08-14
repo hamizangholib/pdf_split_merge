@@ -1,13 +1,26 @@
-import { PDFDocument } from 'pdf-lib';
-
-/** ISO/US page sizes in PDF points, portrait. */
-export const pageSizes = {
-  a4: [595.28, 841.89],
-  letter: [612, 792],
-};
+/**
+ * Turning whatever the visitor picked into bytes a PDF can hold.
+ *
+ * This is the half of the image tool that has to stay on the main thread: it is
+ * where the browser's own decoders live, including the `<img>` element that
+ * handles the files `createImageBitmap` refuses. The PDF itself is assembled in
+ * the worker, which is why nothing here imports pdf-lib — a second copy of that
+ * library on the main thread cost 410 kB for this one file.
+ */
 
 /** Chrome refuses canvases beyond this on either axis. */
 const maxCanvasSide = 16384;
+
+/**
+ * What the worker should try first with these bytes: their original form is
+ * always worth attempting, because embedding them untouched is the only way a
+ * clean photo survives with its quality intact.
+ */
+export function imageKind(file) {
+  if (file.type === 'image/jpeg' || /\.jpe?g$/i.test(file.name)) return 'jpeg';
+  if (file.type === 'image/png' || /\.png$/i.test(file.name)) return 'png';
+  return 'other';
+}
 
 /**
  * Decodes anything the browser can display. `createImageBitmap` is the fast
@@ -37,9 +50,15 @@ async function decodeImage(blob) {
   }
 }
 
-/** Redraws a decoded image as baseline JPEG, which pdf-lib always accepts. */
-async function reencodeAsJpeg(file, bytes) {
+/**
+ * Redraws a file as baseline JPEG, which pdf-lib always accepts. This is the
+ * repair path: it runs only for the files the worker could not embed as they
+ * were — CMYK JPEGs, unusual PNG variants, WebP, AVIF, GIF, BMP.
+ */
+export async function reencodeAsJpeg(file) {
+  const bytes = new Uint8Array(await file.arrayBuffer());
   const blob = new Blob([bytes], { type: file.type || 'application/octet-stream' });
+
   let source;
   try {
     source = await decodeImage(blob);
@@ -72,95 +91,4 @@ async function reencodeAsJpeg(file, bytes) {
     );
   }
   return new Uint8Array(await jpeg.arrayBuffer());
-}
-
-/**
- * Embeds one image, preferring the original bytes so quality is untouched, and
- * falling back to a browser re-encode when pdf-lib cannot parse them — CMYK
- * JPEGs and unusual PNG variants land here rather than failing outright.
- */
-async function embedImage(output, file) {
-  const bytes = new Uint8Array(await file.arrayBuffer());
-  const isJpeg = file.type === 'image/jpeg' || /\.jpe?g$/i.test(file.name);
-  const isPng = file.type === 'image/png' || /\.png$/i.test(file.name);
-
-  if (isJpeg || isPng) {
-    try {
-      return isJpeg ? await output.embedJpg(bytes) : await output.embedPng(bytes);
-    } catch {
-      // Not a usable JPEG/PNG despite the extension — repair it below.
-    }
-  }
-
-  return output.embedJpg(await reencodeAsJpeg(file, bytes));
-}
-
-/**
- * Builds a PDF from image files, one image per page.
- *
- * `pageSize` is either 'fit' (each page matches its image) or a key of
- * `pageSizes`. `margin` is in points and only applies to fixed page sizes.
- *
- * Files that cannot be converted are skipped and reported rather than aborting
- * the whole batch — one bad photo should not cost the other forty.
- */
-export async function imagesToPdf(
-  files,
-  { pageSize = 'fit', margin = 0, orientation = 'auto' } = {},
-  onFile,
-) {
-  if (files.length === 0) throw new Error('Pilih minimal satu gambar.');
-
-  const output = await PDFDocument.create();
-  output.setProducer('PDF Toolkit');
-  output.setCreator('PDF Toolkit');
-
-  const skipped = [];
-
-  for (const [position, file] of files.entries()) {
-    await onFile?.(position, file);
-
-    let image;
-    try {
-      image = await embedImage(output, file);
-    } catch (error) {
-      skipped.push({ file, reason: error?.message ?? 'Gagal dibaca.' });
-      continue;
-    }
-
-    if (pageSize === 'fit') {
-      const page = output.addPage([image.width, image.height]);
-      page.drawImage(image, { x: 0, y: 0, width: image.width, height: image.height });
-      continue;
-    }
-
-    const [shortSide, longSide] = pageSizes[pageSize] ?? pageSizes.a4;
-    const landscape =
-      orientation === 'landscape' || (orientation === 'auto' && image.width > image.height);
-    const [pageWidth, pageHeight] = landscape ? [longSide, shortSide] : [shortSide, longSide];
-
-    const page = output.addPage([pageWidth, pageHeight]);
-    const boxWidth = Math.max(pageWidth - margin * 2, 1);
-    const boxHeight = Math.max(pageHeight - margin * 2, 1);
-    const scale = Math.min(boxWidth / image.width, boxHeight / image.height);
-    const width = image.width * scale;
-    const height = image.height * scale;
-
-    page.drawImage(image, {
-      x: (pageWidth - width) / 2,
-      y: (pageHeight - height) / 2,
-      width,
-      height,
-    });
-  }
-
-  if (output.getPageCount() === 0) {
-    throw new Error(
-      skipped.length === 1
-        ? skipped[0].reason
-        : `Tidak ada gambar yang bisa dikonversi. ${skipped.length} file gagal dibaca.`,
-    );
-  }
-
-  return { bytes: await output.save(), skipped };
 }

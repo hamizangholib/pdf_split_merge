@@ -3,19 +3,22 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>PDF Toolkit — Gabungkan, Pisahkan & Ubah Dokumen</title>
+    <title>PDF Toolkit — Gabungkan, Pisahkan & Ubah PDF di Browser</title>
     <meta
       name="description"
-      content="Gabungkan, pisahkan, atur, perkecil PDF, dan ubah Markdown menjadi PDF langsung di browser. Tanpa unggah, tanpa server, 100% privat."
+      content="Gabungkan, pisahkan, atur halaman, perkecil PDF, dan ubah gambar atau Markdown menjadi PDF langsung di browser. Tanpa unggah, tanpa server, 100% privat."
     />
     <meta name="theme-color" content="#4b8ef1" />
+    <link rel="canonical" href="https://hamizangholib.github.io/pdf_split_merge/" />
 
     <!-- Social cards. og:image must be absolute, so it names the deployed site
-         directly — update these two URLs if the repository is renamed. -->
+         directly — update these URLs if the repository is renamed. The build
+         rewrites title/description/url per route; this file carries the home
+         page's values. -->
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="PDF Toolkit" />
     <meta property="og:locale" content="id_ID" />
-    <meta property="og:title" content="PDF Toolkit — Gabungkan, Pisahkan & Ubah Dokumen" />
+    <meta property="og:title" content="PDF Toolkit — Gabungkan, Pisahkan & Ubah PDF di Browser" />
     <meta
       property="og:description"
       content="Gabungkan, pisahkan, atur halaman, ubah gambar dan Markdown menjadi PDF, lalu perkecil ukurannya — semuanya di dalam browser Anda."
@@ -29,7 +32,7 @@
     <meta property="og:image:height" content="630" />
     <meta property="og:image:alt" content="Logo PDF Toolkit" />
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="PDF Toolkit — Gabungkan, Pisahkan & Ubah Dokumen" />
+    <meta name="twitter:title" content="PDF Toolkit — Gabungkan, Pisahkan & Ubah PDF di Browser" />
     <meta
       name="twitter:description"
       content="Alat PDF yang berjalan sepenuhnya di browser. Tanpa unggah, tanpa server."
@@ -39,17 +42,35 @@
       content="https://hamizangholib.github.io/pdf_split_merge/og-card.png"
     />
 
-    <link rel="apple-touch-icon" href="./apple-touch-icon.png" />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700;900&display=swap"
-      rel="stylesheet"
-    />
+    <link rel="apple-touch-icon" href="%BASE_URL%apple-touch-icon.png" />
+    <!-- Roboto is served from this origin; see the @font-face block in style.css. -->
     <link
       rel="icon"
       href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%235b68eb'/%3E%3Cstop offset='1' stop-color='%2328e1fd'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='32' height='32' rx='9' fill='url(%23g)'/%3E%3Crect x='4' y='5' width='10' height='22' rx='2.5' fill='%23fff'/%3E%3Cpath d='M18 5.5 27.5 8.8v14.4L18 26.5Z' fill='%23fff'/%3E%3C/svg%3E"
     />
+
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "WebApplication",
+        "name": "PDF Toolkit",
+        "url": "https://hamizangholib.github.io/pdf_split_merge/",
+        "applicationCategory": "UtilitiesApplication",
+        "operatingSystem": "Any",
+        "browserRequirements": "Membutuhkan JavaScript",
+        "inLanguage": "id",
+        "offers": { "@type": "Offer", "price": "0", "priceCurrency": "IDR" },
+        "description": "Alat PDF yang berjalan sepenuhnya di browser: gabungkan, pisahkan, atur halaman, ubah gambar dan Markdown menjadi PDF, lalu perkecil ukurannya. Tidak ada berkas yang diunggah.",
+        "featureList": [
+          "Gabungkan PDF",
+          "Pisahkan PDF",
+          "Atur halaman PDF",
+          "Gambar ke PDF",
+          "Markdown ke PDF",
+          "Perkecil ukuran PDF"
+        ]
+      }
+    </script>
   </head>
   <body class="bg-white text-ink-80 antialiased">
     <!-- preloader: removed by main.js once the first view is painted -->
@@ -59,12 +80,21 @@
       </div>
     </div>
 
+    <!-- Six navigation links stand between the top of the page and the upload
+         area; this is the way past them for anyone browsing by keyboard. -->
+    <a href="#app" class="skip-link">Lompat ke konten</a>
+
+    <!-- Single-page navigation fires no page-load event, so route changes are
+         announced here instead. -->
+    <p id="route-announcer" class="sr-only" role="status" aria-live="polite"></p>
+
     <!-- global-nav -->
     <header class="site-header sticky top-0 z-50 h-20 bg-white shadow-soft">
       <nav
         class="mx-auto flex h-full max-w-[1200px] items-center gap-6 overflow-x-auto px-5 text-nav text-ink-80"
+        aria-label="Navigasi utama"
       >
-        <a href="#/" class="flex shrink-0 items-center gap-2.5 text-tagline text-ink">
+        <a href="%BASE_URL%" class="flex shrink-0 items-center gap-2.5 text-tagline text-ink">
           <span
             class="flex size-9 items-center justify-center rounded-md bg-brand-gradient text-white"
           >
@@ -88,12 +118,12 @@
 
         <!-- desktop links -->
         <div class="ml-auto hidden items-center gap-6 lg:flex">
-          <a href="#/merge" class="nav-link shrink-0 transition-colors hover:text-action">Gabungkan</a>
-          <a href="#/split" class="nav-link shrink-0 transition-colors hover:text-action">Pisahkan</a>
-          <a href="#/organize" class="nav-link shrink-0 transition-colors hover:text-action">Atur Halaman</a>
-          <a href="#/images" class="nav-link shrink-0 transition-colors hover:text-action">Gambar ke PDF</a>
-          <a href="#/markdown" class="nav-link shrink-0 transition-colors hover:text-action">Markdown ke PDF</a>
-          <a href="#/compress" class="nav-link shrink-0 transition-colors hover:text-action">Perkecil</a>
+          <a href="%BASE_URL%gabungkan-pdf/" class="nav-link shrink-0 transition-colors hover:text-action">Gabungkan</a>
+          <a href="%BASE_URL%pisahkan-pdf/" class="nav-link shrink-0 transition-colors hover:text-action">Pisahkan</a>
+          <a href="%BASE_URL%atur-halaman-pdf/" class="nav-link shrink-0 transition-colors hover:text-action">Atur Halaman</a>
+          <a href="%BASE_URL%gambar-ke-pdf/" class="nav-link shrink-0 transition-colors hover:text-action">Gambar ke PDF</a>
+          <a href="%BASE_URL%markdown-ke-pdf/" class="nav-link shrink-0 transition-colors hover:text-action">Markdown ke PDF</a>
+          <a href="%BASE_URL%perkecil-pdf/" class="nav-link shrink-0 transition-colors hover:text-action">Perkecil</a>
           <span
             class="gradient-drift hidden shrink-0 items-center gap-2 rounded-full bg-brand-gradient px-6 py-2.5 text-white xl:flex"
           >
@@ -121,22 +151,27 @@
         id="mobile-menu"
         class="mobile-menu absolute inset-x-0 top-20 border-b border-hairline bg-white shadow-soft lg:hidden"
       >
+        <!-- The animated grid row has to be able to collapse to nothing, and
+             padding does not collapse — so the padded panel sits one level in,
+             behind this bare clipping wrapper. -->
+        <div>
         <div class="mx-auto flex max-w-[1200px] flex-col px-5 py-2 text-body">
-          <a href="#/merge" class="border-b border-divider py-3.5 text-ink-80 transition-colors hover:text-action">Gabungkan</a>
-          <a href="#/split" class="border-b border-divider py-3.5 text-ink-80 transition-colors hover:text-action">Pisahkan</a>
-          <a href="#/organize" class="border-b border-divider py-3.5 text-ink-80 transition-colors hover:text-action">Atur Halaman</a>
-          <a href="#/images" class="border-b border-divider py-3.5 text-ink-80 transition-colors hover:text-action">Gambar ke PDF</a>
-          <a href="#/markdown" class="border-b border-divider py-3.5 text-ink-80 transition-colors hover:text-action">Markdown ke PDF</a>
-          <a href="#/compress" class="py-3.5 text-ink-80 transition-colors hover:text-action">Perkecil</a>
+          <a href="%BASE_URL%gabungkan-pdf/" class="border-b border-divider py-3.5 text-ink-80 transition-colors hover:text-action">Gabungkan</a>
+          <a href="%BASE_URL%pisahkan-pdf/" class="border-b border-divider py-3.5 text-ink-80 transition-colors hover:text-action">Pisahkan</a>
+          <a href="%BASE_URL%atur-halaman-pdf/" class="border-b border-divider py-3.5 text-ink-80 transition-colors hover:text-action">Atur Halaman</a>
+          <a href="%BASE_URL%gambar-ke-pdf/" class="border-b border-divider py-3.5 text-ink-80 transition-colors hover:text-action">Gambar ke PDF</a>
+          <a href="%BASE_URL%markdown-ke-pdf/" class="border-b border-divider py-3.5 text-ink-80 transition-colors hover:text-action">Markdown ke PDF</a>
+          <a href="%BASE_URL%perkecil-pdf/" class="py-3.5 text-ink-80 transition-colors hover:text-action">Perkecil</a>
           <span class="flex items-center gap-2 py-4 text-caption text-ink-48">
             <i data-lucide="shield-check" class="size-4"></i>
             Diproses di perangkat Anda
           </span>
         </div>
+        </div>
       </div>
     </header>
 
-    <main id="app"></main>
+    <main id="app" tabindex="-1"></main>
 
     <!-- footer -->
     <footer class="bg-tile-1 px-5 py-16 text-muted-dark">
@@ -172,12 +207,12 @@
           <div class="space-y-2">
             <h2 class="text-caption font-bold text-white">Alat</h2>
             <ul class="space-y-1.5 text-caption">
-              <li><a href="#/merge" class="transition-colors hover:text-action-dark">Gabungkan PDF</a></li>
-              <li><a href="#/split" class="transition-colors hover:text-action-dark">Pisahkan PDF</a></li>
-              <li><a href="#/organize" class="transition-colors hover:text-action-dark">Atur Halaman</a></li>
-              <li><a href="#/images" class="transition-colors hover:text-action-dark">Gambar ke PDF</a></li>
-              <li><a href="#/markdown" class="transition-colors hover:text-action-dark">Markdown ke PDF</a></li>
-              <li><a href="#/compress" class="transition-colors hover:text-action-dark">Perkecil PDF</a></li>
+              <li><a href="%BASE_URL%gabungkan-pdf/" class="transition-colors hover:text-action-dark">Gabungkan PDF</a></li>
+              <li><a href="%BASE_URL%pisahkan-pdf/" class="transition-colors hover:text-action-dark">Pisahkan PDF</a></li>
+              <li><a href="%BASE_URL%atur-halaman-pdf/" class="transition-colors hover:text-action-dark">Atur Halaman PDF</a></li>
+              <li><a href="%BASE_URL%gambar-ke-pdf/" class="transition-colors hover:text-action-dark">Gambar ke PDF</a></li>
+              <li><a href="%BASE_URL%markdown-ke-pdf/" class="transition-colors hover:text-action-dark">Markdown ke PDF</a></li>
+              <li><a href="%BASE_URL%perkecil-pdf/" class="transition-colors hover:text-action-dark">Perkecil PDF</a></li>
             </ul>
           </div>
 

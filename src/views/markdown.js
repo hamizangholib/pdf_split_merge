@@ -7,8 +7,8 @@ import {
   html,
   keepMarkdown,
   paintIcons,
+  paintStatus,
   setVisible,
-  statusMarkup,
 } from '../lib/ui.js';
 import { documentCss, guessTitle, printMarkdown, renderMarkdown } from '../lib/markdown.js';
 import { subNavMarkup } from '../lib/nav.js';
@@ -42,7 +42,7 @@ export function renderMarkdownView() {
 
   const root = html(`
     <div>
-      ${subNavMarkup('#/markdown')}
+      ${subNavMarkup('markdown-ke-pdf')}
 
       <section class="mx-auto max-w-[1200px] space-y-8 px-5 py-16">
         <header class="space-y-3">
@@ -149,8 +149,7 @@ export function renderMarkdownView() {
   function setStatus(status, message) {
     state.status = status;
     state.message = message;
-    statusHost.innerHTML = statusMarkup(status, message);
-    paintIcons(statusHost);
+    paintStatus(statusHost, status, message);
   }
 
   function documentTitle() {

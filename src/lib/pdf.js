@@ -1,19 +1,114 @@
-import { PDFDocument, degrees } from 'pdf-lib';
+/**
+ * The main thread's view of PDF processing.
+ *
+ * Nothing here does any real work: every operation is forwarded to the worker
+ * in `pdfops.worker.js`, which keeps the tab responsive no matter how large the
+ * document is. The one exception is `parsePageRanges`, which validates what the
+ * user is typing and has to answer on the keystroke.
+ */
+
+/** id -> the promise waiting on that message. */
+const pending = new Map();
+let worker;
+let sequence = 0;
+
+function failPending(message) {
+  for (const entry of pending.values()) entry.reject(new Error(message));
+  pending.clear();
+}
 
 /**
- * Loads a File/Blob into a pdf-lib document, translating library errors into
- * messages a person can act on.
+ * The worker is bundled as a classic script, so it is created without
+ * `type: 'module'` and works in any browser that has Workers at all. That is
+ * why there is no main-thread fallback: keeping one meant shipping a second
+ * copy of pdf-lib (410 kB) to cover browsers that could not run the rest of the
+ * app either.
  */
-export async function loadDocument(file, source) {
-  const bytes = source ?? (await file.arrayBuffer());
-  try {
-    return await PDFDocument.load(bytes, { ignoreEncryption: true });
-  } catch {
-    throw new Error(
-      `"${file.name}" tidak dapat dibaca. File mungkin rusak, terenkripsi, atau bukan PDF yang valid.`,
-    );
-  }
+function ensureWorker() {
+  if (worker !== undefined) return worker;
+
+  worker = new Worker(new URL('./pdfops.worker.js', import.meta.url));
+
+  worker.onmessage = ({ data }) => {
+    const entry = pending.get(data.id);
+    if (!entry) return;
+
+    if (data.progress !== undefined) {
+      entry.onProgress?.(data.progress);
+      return;
+    }
+
+    pending.delete(data.id);
+    if (data.ok) entry.resolve(data.result);
+    else entry.reject(new Error(data.error));
+  };
+
+  worker.onerror = () => {
+    // A worker that failed to boot never recovers. Retire it so the next call
+    // starts a fresh one instead of every request hanging on a dead thread.
+    worker = undefined;
+    failPending('Pemrosesan PDF di latar belakang gagal dimulai. Coba muat ulang halaman.');
+  };
+
+  return worker;
 }
+
+function run(op, payload, { transfer = [], onProgress } = {}) {
+  const active = ensureWorker();
+  const id = ++sequence;
+
+  return new Promise((resolve, reject) => {
+    pending.set(id, { resolve, reject, onProgress });
+    active.postMessage({ id, op, payload }, transfer);
+  });
+}
+
+/* -------------------------------------------------------------- public API */
+
+/**
+ * Validates a file and returns a handle for the tools to work against.
+ *
+ * `bytes` is handed to the worker rather than copied, so the caller must not
+ * touch it afterwards — that is the whole point: one copy of the file exists,
+ * and it lives on the thread doing the work.
+ */
+export function openDocument(bytes, name) {
+  return run('open', { bytes, name }, { transfer: [bytes.buffer] });
+}
+
+export function closeDocument(docId) {
+  if (docId != null) run('close', { docId });
+}
+
+export const startMerge = () => run('mergeStart', {});
+
+export const addToMerge = (mergeId, bytes, name) =>
+  run('mergeAdd', { mergeId, bytes, name }, { transfer: [bytes.buffer] });
+
+export const finishMerge = (mergeId) => run('mergeFinish', { mergeId });
+
+export const abortMerge = (mergeId) => run('mergeAbort', { mergeId }).catch(() => {});
+
+export const extractPages = (docId, indices) => run('extract', { docId, indices });
+
+export const extractPagesToZip = (docId, indices, base, width, onProgress) =>
+  run('extractZip', { docId, indices, base, width }, { onProgress });
+
+export const arrangePages = (docId, order) => run('arrange', { docId, order });
+
+export const startImages = () => run('imagesStart', {});
+
+export const addImage = (imagesId, bytes, kind) =>
+  run('imagesAdd', { imagesId, bytes, kind }, { transfer: [bytes.buffer] });
+
+export const buildImages = (imagesId, options) => run('imagesBuild', { imagesId, ...options });
+
+export const abortImages = (imagesId) => run('imagesAbort', { imagesId }).catch(() => {});
+
+export const compressDocument = (docId, level, onProgress) =>
+  run('compress', { docId, level }, { onProgress });
+
+/* ------------------------------------------------------------- pure helper */
 
 /**
  * Parses a human page-range string ("1-3, 5, 7-10") into zero-based page
@@ -59,68 +154,4 @@ export function parsePageRanges(input, totalPages) {
 
   if (indices.length === 0) throw new Error('Tidak ada halaman yang terpilih.');
   return indices;
-}
-
-/** Merges the given PDF files, in order, into a single document. */
-export async function mergePdfs(files, onFile, decorate) {
-  if (files.length < 2) throw new Error('Pilih minimal dua file PDF untuk digabungkan.');
-
-  const merged = await PDFDocument.create();
-  merged.setProducer('PDF Toolkit');
-  merged.setCreator('PDF Toolkit');
-
-  for (const [position, file] of files.entries()) {
-    await onFile?.(position, file);
-    const source = await loadDocument(file);
-    const pages = await merged.copyPages(source, source.getPageIndices());
-    pages.forEach((page) => merged.addPage(page));
-  }
-
-  if (merged.getPageCount() === 0) {
-    throw new Error('File yang dipilih tidak memiliki halaman apa pun.');
-  }
-  decorate?.(merged);
-  return merged.save();
-}
-
-/** Extracts the given zero-based page indices into a brand new document. */
-export async function extractPages(sourceDocument, indices, decorate) {
-  const output = await PDFDocument.create();
-  output.setProducer('PDF Toolkit');
-  output.setCreator('PDF Toolkit');
-
-  const pages = await output.copyPages(sourceDocument, indices);
-  pages.forEach((page) => output.addPage(page));
-
-  decorate?.(output);
-  return output.save();
-}
-
-/**
- * Rebuilds a document from `order` — a list of { index, rotation } describing
- * which source page goes where, and how much extra rotation it gets on top of
- * the rotation it already carries.
- */
-export async function arrangePages(sourceDocument, order, decorate) {
-  if (order.length === 0) throw new Error('Tidak ada halaman yang tersisa untuk disimpan.');
-
-  const output = await PDFDocument.create();
-  output.setProducer('PDF Toolkit');
-  output.setCreator('PDF Toolkit');
-
-  const pages = await output.copyPages(
-    sourceDocument,
-    order.map((entry) => entry.index),
-  );
-
-  pages.forEach((page, position) => {
-    const extra = order[position].rotation ?? 0;
-    if (extra) {
-      page.setRotation(degrees((page.getRotation().angle + extra) % 360));
-    }
-    output.addPage(page);
-  });
-
-  decorate?.(output);
-  return output.save();
 }

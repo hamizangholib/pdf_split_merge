@@ -1,5 +1,6 @@
 import { paintIcons } from './ui.js';
 import { renderThumbnail, renderWhenVisible } from './preview.js';
+import { fadeIn } from './motion.js';
 
 /**
  * Lazily rasterises every `[data-thumb]` inside `container` whose card carries
@@ -10,8 +11,14 @@ import { renderThumbnail, renderWhenVisible } from './preview.js';
 export function attachThumbnails(container, pdfDocument, { size = 220, isStale, cache } = {}) {
   const stops = [];
 
-  const paint = (thumb, url, pageNumber) => {
+  /**
+   * `arriving` separates a page that has just finished rasterising from one
+   * being repainted out of the cache. Only the first deserves a fade — fading
+   * the cached ones too would flash the whole grid on every reorder.
+   */
+  const paint = (thumb, url, pageNumber, arriving) => {
     thumb.innerHTML = `<img src="${url}" alt="Pratinjau halaman ${pageNumber}" class="max-h-full max-w-full object-contain transition-transform duration-200" />`;
+    if (arriving) fadeIn(thumb.firstElementChild);
     thumb.dispatchEvent(new CustomEvent('thumbready', { bubbles: true }));
   };
 
@@ -23,7 +30,7 @@ export function attachThumbnails(container, pdfDocument, { size = 220, isStale, 
     // pages again and again.
     const cached = cache?.get(pageNumber);
     if (cached) {
-      paint(thumb, cached, pageNumber);
+      paint(thumb, cached, pageNumber, false);
       continue;
     }
 
@@ -35,7 +42,7 @@ export function attachThumbnails(container, pdfDocument, { size = 220, isStale, 
           const url = await renderThumbnail(pdfDocument, pageNumber, size);
           if (isStale?.()) return;
           cache?.set(pageNumber, url);
-          paint(thumb, url, pageNumber);
+          paint(thumb, url, pageNumber, true);
         } catch {
           thumb.innerHTML = '<i data-lucide="circle-alert" class="size-5 text-[#b3261e]"></i>';
           paintIcons(thumb);
