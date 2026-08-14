@@ -19,9 +19,16 @@ Aplikasi web modern, cepat, dan aman berbasis browser untuk **menggabungkan (Mer
   - Pratinjau visual (thumbnail) untuk setiap halaman PDF dengan renderer PDF.js.
   - Pemilihan rentang halaman fleksibel (contoh: `1-3, 5, 7-10`).
   - Ekstraksi tiap halaman menjadi file PDF terpisah dan unduh sekaligus dalam format `.zip`.
-- 🎨 **Antarmuka Premium (Apple-inspired UI)**:
-  - Tampilan bersih, minimalis, dan responsif menggunakan Tailwind CSS v4.
-  - Dukungan visual intuitif dengan fitur area dropzone (Drag & Drop).
+- 🗂️ **Atur Halaman, Gambar ke PDF, dan Perkecil PDF**: susun ulang/putar/hapus halaman, ubah JPG–PNG menjadi PDF, dan kurangi ukuran berkas tanpa meraster teks.
+- 📝 **Markdown ke PDF**:
+  - Unggah berkas `.md`/`.txt` atau tempel langsung teksnya, dengan pratinjau langsung.
+  - Mendukung heading, daftar, **tabel**, blok kode, kutipan, dan gambar.
+  - PDF dihasilkan lewat mesin cetak browser (dialog *Save as PDF*), sehingga teksnya tetap teks — bisa dipilih dan dicari.
+  - HTML mentah di dalam markdown dibersihkan (script, iframe, `on*`, `javascript:`) sebelum dirender.
+- 🎨 **Antarmuka bergaya Chain App Dev**:
+  - Roboto, aksen biru `#4b8ef1`, dan gradien `#5b68eb → #28e1fd` untuk aksi utama.
+  - Kartu bayangan lembut, seksi putih/abu bergantian, preloader, dan animasi scroll-reveal.
+  - Responsif dengan Tailwind CSS v4 dan area dropzone (Drag & Drop).
 
 ---
 
@@ -32,6 +39,7 @@ Aplikasi web modern, cepat, dan aman berbasis browser untuk **menggabungkan (Mer
 - **Styling**: [Tailwind CSS v4](https://tailwindcss.com/)
 - **PDF Processing**: [pdf-lib](https://pdf-lib.js.org/) *(Manipulasi & pembuatan berkas PDF)*
 - **PDF Rendering**: [pdfjs-dist](https://mozilla.github.io/pdf.js/) *(Render thumbnail halaman)*
+- **Markdown**: [marked](https://marked.js.org/) *(Parser Markdown/GFM)*
 - **Icons**: [Lucide Icons](https://lucide.dev/)
 
 ---
@@ -92,11 +100,14 @@ pdf-toolkit/
 │   ├── lib/              # Core module & helper
 │   │   ├── pdf.js        # Pengolah PDF (Merge, Split, Parse range)
 │   │   ├── preview.js    # Rendering thumbnail halaman PDF dengan PDF.js
+│   │   ├── markdown.js   # Parser + sanitizer Markdown & mesin cetak PDF
+│   │   ├── reveal.js     # Animasi scroll-reveal (IntersectionObserver)
 │   │   ├── ui.js         # Utilities DOM & UI helper
 │   │   └── zip.js        # Generator file ZIP client-side
 │   ├── views/            # Tampilan halaman
 │   │   ├── welcome.js    # Halaman Utama / Landing page
 │   │   ├── merge.js      # Fitur penggabungan PDF
+│   │   ├── markdown.js   # Fitur Markdown ke PDF
 │   │   └── split.js      # Fitur pemisahan PDF
 │   ├── main.js           # Router (Hash-based) & Entry point
 │   └── style.css         # Styling utama & Tailwind v4 imports

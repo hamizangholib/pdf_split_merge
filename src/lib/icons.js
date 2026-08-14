@@ -42,6 +42,13 @@ const shapes = {
     <path d="M12 21.6v-3.4"/>
     <path d="M14.3 20.4 12 18.1l-2.3 2.3"/>
   `,
+  /** A markdown sheet: the "M" chevron mark above a line of text. */
+  markdown: `
+    <rect x="2.6" y="4.6" width="18.8" height="14.8" rx="2.4"/>
+    <path d="M6.2 15.6V8.4l3 3.6 3-3.6v7.2"/>
+    <path d="M15.6 8.4v5.2"/>
+    <path d="M13.4 12.4 15.6 15l2.2-2.6"/>
+  `,
   /** The house mark: a sheet beside a page turning away from it. */
   brand: `
     <rect x="3.6" y="4.6" width="7" height="14.8" rx="1.8"/>

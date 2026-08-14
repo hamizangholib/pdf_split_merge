@@ -31,6 +31,13 @@ export const tools = [
     blurb: 'Ubah kumpulan JPG atau PNG menjadi satu PDF, lengkap dengan pengaturan halaman.',
   },
   {
+    hash: '#/markdown',
+    label: 'Markdown ke PDF',
+    title: 'Markdown ke PDF',
+    icon: 'markdown',
+    blurb: 'Ubah catatan .md — lengkap dengan tabel, blok kode, dan gambar — menjadi PDF rapi.',
+  },
+  {
     hash: '#/compress',
     label: 'Perkecil',
     title: 'Perkecil PDF',
@@ -51,8 +58,8 @@ export function subNavMarkup(currentHash) {
     .join('');
 
   return `
-    <div class="sticky top-11 z-40 border-b border-hairline bg-parchment/80 backdrop-blur-xl backdrop-saturate-150">
-      <div class="mx-auto flex h-[52px] max-w-[1120px] items-center gap-4 overflow-x-auto px-5">
+    <div class="sticky top-20 z-40 border-b border-hairline bg-white/85 backdrop-blur-xl backdrop-saturate-150">
+      <div class="mx-auto flex h-[56px] max-w-[1200px] items-center gap-4 overflow-x-auto px-5">
         <a href="#/" class="flex shrink-0 items-center gap-1.5 text-caption ${cls.link}">
           <i data-lucide="arrow-left" class="size-4"></i>
           Beranda

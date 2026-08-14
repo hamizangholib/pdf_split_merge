@@ -98,6 +98,16 @@ export function keepImages(fileList) {
   );
 }
 
+/** Keeps only text files a markdown parser can make sense of. */
+export function keepMarkdown(fileList) {
+  return Array.from(fileList).filter(
+    (file) =>
+      file.type === 'text/markdown' ||
+      file.type === 'text/plain' ||
+      /\.(md|markdown|mdown|mkd|txt)$/i.test(file.name),
+  );
+}
+
 /** Triggers a browser download for the produced bytes. */
 export function downloadBytes(bytes, filename, type = 'application/pdf') {
   const url = URL.createObjectURL(new Blob([bytes], { type }));
@@ -228,18 +238,18 @@ export function attachDropzone(zone, input, onFiles, filter = keepPdfs) {
 
 export const cls = {
   pillPrimary:
-    'inline-flex items-center justify-center gap-2 rounded-full bg-action px-[22px] py-[11px] text-body text-white transition-transform active:scale-95 disabled:pointer-events-none disabled:bg-hairline disabled:text-ink-48',
+    'inline-flex items-center justify-center gap-2 rounded-full bg-brand-gradient px-7 py-3 text-caption font-medium text-white shadow-soft transition-all hover:-translate-y-0.5 active:translate-y-0 disabled:pointer-events-none disabled:bg-none disabled:bg-hairline disabled:text-ink-48 disabled:shadow-none',
   pillGhost:
-    'inline-flex items-center justify-center gap-2 rounded-full border border-action px-[22px] py-[11px] text-body text-action transition-transform active:scale-95',
+    'inline-flex items-center justify-center gap-2 rounded-full border border-action bg-white px-7 py-3 text-caption font-medium text-action transition-all hover:bg-action hover:text-white active:translate-y-0',
   pillGhostDark:
-    'inline-flex items-center justify-center gap-2 rounded-full border border-action-dark px-[22px] py-[11px] text-body text-action-dark transition-transform active:scale-95',
+    'inline-flex items-center justify-center gap-2 rounded-full border border-action-dark px-7 py-3 text-caption font-medium text-action-dark transition-all hover:bg-action-dark hover:text-tile-1',
   iconButton:
-    'inline-flex size-9 items-center justify-center rounded-sm text-ink-48 transition-transform hover:text-ink active:scale-95 disabled:pointer-events-none disabled:opacity-30',
-  card: 'rounded-lg border border-hairline bg-white p-6',
+    'inline-flex size-9 items-center justify-center rounded-full text-ink-48 transition-colors hover:bg-parchment hover:text-action active:scale-95 disabled:pointer-events-none disabled:opacity-30',
+  card: 'rounded-md bg-white p-6 shadow-soft',
   link: 'text-action transition-opacity hover:opacity-70',
-  chip: 'rounded-full bg-pearl px-4 py-2 text-caption text-ink-80 transition-transform active:scale-95 disabled:pointer-events-none disabled:opacity-40',
+  chip: 'rounded-full bg-parchment px-4 py-2 text-caption text-ink-80 transition-colors hover:bg-white hover:text-action hover:shadow-soft disabled:pointer-events-none disabled:opacity-40',
   radioCard:
-    'flex cursor-pointer items-start gap-3 rounded-md border border-hairline bg-white p-4 has-checked:border-action',
+    'flex cursor-pointer items-start gap-3 rounded-md border border-hairline bg-white p-4 transition-colors has-checked:border-action has-checked:shadow-soft',
 };
 
 /** The dropzone shell, shared by both tools. */
@@ -250,9 +260,9 @@ export function dropzoneMarkup({ id, multiple, title, hint, accept = 'applicatio
         id="${id}-zone"
         role="button"
         tabindex="0"
-        class="dropzone flex cursor-pointer flex-col items-center justify-center gap-4 rounded-lg border border-hairline bg-white px-6 py-16 text-center transition-colors"
+        class="dropzone flex cursor-pointer flex-col items-center justify-center gap-4 rounded-md border border-dashed border-hairline bg-white px-6 py-16 text-center shadow-soft transition-colors"
       >
-        <span class="flex size-14 items-center justify-center rounded-full bg-parchment text-action">
+        <span class="dropzone-glyph flex size-14 items-center justify-center rounded-full bg-brand-gradient text-white">
           <i data-lucide="upload" class="size-6"></i>
         </span>
         <span class="text-tagline text-ink">${title}</span>
@@ -283,7 +293,7 @@ export function statusMarkup(state, message) {
   const theme = themes[state] ?? themes.working;
 
   return `
-    <div class="flex items-start gap-3 rounded-lg bg-parchment px-5 py-4 ${theme.tone}" role="status" aria-live="polite">
+    <div class="flex items-start gap-3 rounded-md bg-parchment px-5 py-4 ${theme.tone}" role="status" aria-live="polite">
       <i data-lucide="${theme.icon}" class="mt-0.5 size-[18px] shrink-0 ${theme.spin ? 'animate-spin' : ''}"></i>
       <p class="text-caption">${message}</p>
     </div>

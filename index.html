@@ -3,52 +3,68 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>PDF Toolkit — Gabungkan & Pisahkan PDF</title>
+    <title>PDF Toolkit — Gabungkan, Pisahkan & Ubah Dokumen</title>
     <meta
       name="description"
-      content="Gabungkan dan pisahkan file PDF langsung di browser. Tanpa unggah, tanpa server, 100% privat."
+      content="Gabungkan, pisahkan, atur, perkecil PDF, dan ubah Markdown menjadi PDF langsung di browser. Tanpa unggah, tanpa server, 100% privat."
     />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700;900&display=swap"
       rel="stylesheet"
     />
     <link
       rel="icon"
-      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230066cc'/%3E%3Crect x='4' y='5' width='10' height='22' rx='2.5' fill='%23fff'/%3E%3Cpath d='M18 5.5 27.5 8.8v14.4L18 26.5Z' fill='%23fff'/%3E%3C/svg%3E"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%235b68eb'/%3E%3Cstop offset='1' stop-color='%2328e1fd'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='32' height='32' rx='9' fill='url(%23g)'/%3E%3Crect x='4' y='5' width='10' height='22' rx='2.5' fill='%23fff'/%3E%3Cpath d='M18 5.5 27.5 8.8v14.4L18 26.5Z' fill='%23fff'/%3E%3C/svg%3E"
     />
   </head>
-  <body class="bg-white text-ink antialiased">
+  <body class="bg-white text-ink-80 antialiased">
+    <!-- preloader: removed by main.js once the first view is painted -->
+    <div id="preloader" class="js-preloader">
+      <div class="preloader-dots" role="status" aria-label="Memuat">
+        <span></span><span></span><span></span>
+      </div>
+    </div>
+
     <!-- global-nav -->
-    <header class="sticky top-0 z-50 h-11 bg-black">
+    <header class="site-header sticky top-0 z-50 h-20 bg-white shadow-soft">
       <nav
-        class="mx-auto flex h-full max-w-[1440px] items-center gap-5 overflow-x-auto px-5 text-nav text-white/90"
+        class="mx-auto flex h-full max-w-[1200px] items-center gap-6 overflow-x-auto px-5 text-nav text-ink-80"
       >
-        <a href="#/" class="flex shrink-0 items-center gap-2 font-semibold text-white">
-          <!-- brand mark: a sheet beside a page turning away from it -->
-          <svg
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="1.8"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            class="size-4"
-            aria-hidden="true"
+        <a href="#/" class="flex shrink-0 items-center gap-2.5 text-tagline text-ink">
+          <span
+            class="flex size-9 items-center justify-center rounded-md bg-brand-gradient text-white"
           >
-            <rect x="3.6" y="4.6" width="7" height="14.8" rx="1.8" />
-            <path d="M13.4 5.2 20.4 7.4v9.2l-7 2.2Z" />
-          </svg>
-          PDF Toolkit
+            <!-- brand mark: a sheet beside a page turning away from it -->
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.8"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              class="size-5"
+              aria-hidden="true"
+            >
+              <rect x="3.6" y="4.6" width="7" height="14.8" rx="1.8" />
+              <path d="M13.4 5.2 20.4 7.4v9.2l-7 2.2Z" />
+            </svg>
+          </span>
+          <span class="font-bold">PDF Toolkit</span>
         </a>
-        <a href="#/merge" class="shrink-0 transition-opacity hover:opacity-70">Gabungkan</a>
-        <a href="#/split" class="shrink-0 transition-opacity hover:opacity-70">Pisahkan</a>
-        <a href="#/organize" class="shrink-0 transition-opacity hover:opacity-70">Atur Halaman</a>
-        <a href="#/images" class="shrink-0 transition-opacity hover:opacity-70">Gambar ke PDF</a>
-        <a href="#/compress" class="shrink-0 transition-opacity hover:opacity-70">Perkecil</a>
-        <span class="ml-auto hidden items-center gap-1.5 text-white/60 lg:flex">
-          <i data-lucide="shield-check" class="size-3.5"></i>
+
+        <a href="#/merge" class="nav-link shrink-0 transition-colors hover:text-action">Gabungkan</a>
+        <a href="#/split" class="nav-link shrink-0 transition-colors hover:text-action">Pisahkan</a>
+        <a href="#/organize" class="nav-link shrink-0 transition-colors hover:text-action">Atur Halaman</a>
+        <a href="#/images" class="nav-link shrink-0 transition-colors hover:text-action">Gambar ke PDF</a>
+        <a href="#/markdown" class="nav-link shrink-0 transition-colors hover:text-action">Markdown ke PDF</a>
+        <a href="#/compress" class="nav-link shrink-0 transition-colors hover:text-action">Perkecil</a>
+
+        <span
+          class="gradient-drift ml-auto hidden shrink-0 items-center gap-2 rounded-full bg-brand-gradient px-6 py-2.5 text-white lg:flex"
+        >
+          <i data-lucide="shield-check" class="size-4"></i>
           Diproses di perangkat Anda
         </span>
       </nav>
@@ -57,17 +73,60 @@
     <main id="app"></main>
 
     <!-- footer -->
-    <footer class="bg-parchment px-5 py-16 text-ink-80">
-      <div class="mx-auto max-w-[980px] space-y-4">
-        <p class="text-fine">
-          PDF Toolkit memproses seluruh file di dalam browser Anda menggunakan
-          <span class="text-ink">pdf-lib</span>. Tidak ada file yang dikirim atau disimpan
-          di server mana pun.
-        </p>
-        <div class="h-px bg-hairline"></div>
-        <p class="text-fine text-ink-48">
-          Dibuat dengan Vite, Tailwind CSS, dan pdf-lib. Berjalan sepenuhnya statis di
-          GitHub Pages.
+    <footer class="bg-tile-1 px-5 py-16 text-muted-dark">
+      <div class="mx-auto max-w-[1200px] space-y-8">
+        <div class="grid gap-8 md:grid-cols-3">
+          <div class="space-y-3">
+            <span class="flex items-center gap-2.5 text-tagline text-white">
+              <span
+                class="flex size-8 items-center justify-center rounded-md bg-brand-gradient text-white"
+              >
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.8"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  class="size-4"
+                  aria-hidden="true"
+                >
+                  <rect x="3.6" y="4.6" width="7" height="14.8" rx="1.8" />
+                  <path d="M13.4 5.2 20.4 7.4v9.2l-7 2.2Z" />
+                </svg>
+              </span>
+              PDF Toolkit
+            </span>
+            <p class="text-caption">
+              Seluruh berkas diproses di dalam browser Anda menggunakan pdf-lib. Tidak ada
+              yang dikirim atau disimpan di server mana pun.
+            </p>
+          </div>
+
+          <div class="space-y-2">
+            <h2 class="text-caption font-bold text-white">Alat</h2>
+            <ul class="space-y-1.5 text-caption">
+              <li><a href="#/merge" class="transition-colors hover:text-action-dark">Gabungkan PDF</a></li>
+              <li><a href="#/split" class="transition-colors hover:text-action-dark">Pisahkan PDF</a></li>
+              <li><a href="#/organize" class="transition-colors hover:text-action-dark">Atur Halaman</a></li>
+              <li><a href="#/images" class="transition-colors hover:text-action-dark">Gambar ke PDF</a></li>
+              <li><a href="#/markdown" class="transition-colors hover:text-action-dark">Markdown ke PDF</a></li>
+              <li><a href="#/compress" class="transition-colors hover:text-action-dark">Perkecil PDF</a></li>
+            </ul>
+          </div>
+
+          <div class="space-y-2">
+            <h2 class="text-caption font-bold text-white">Dibangun dengan</h2>
+            <p class="text-caption">
+              Vite, Tailwind CSS, pdf-lib, pdf.js, dan marked. Berjalan sepenuhnya statis
+              di GitHub Pages.
+            </p>
+          </div>
+        </div>
+
+        <div class="h-px bg-white/10"></div>
+        <p class="text-fine text-white/40">
+          Tampilan terinspirasi templat Chain App Dev oleh TemplateMo.
         </p>
       </div>
     </footer>
