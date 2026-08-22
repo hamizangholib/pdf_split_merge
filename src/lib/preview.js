@@ -22,8 +22,21 @@ export async function openPreview(source) {
   const pdfjs = await loadPdfjs();
   const bytes =
     source instanceof Uint8Array ? source.slice() : new Uint8Array(await source.arrayBuffer());
-  return pdfjs.getDocument({ data: bytes }).promise;
+
+  const task = pdfjs.getDocument({ data: bytes });
+  const document_ = await task.promise;
+  loadingTasks.set(document_, task);
+  return document_;
 }
+
+/**
+ * Only the loading task can release a document — the proxy pdf.js hands back
+ * has no `destroy` of its own — and letting it go frees the file's bytes on
+ * pdf.js's worker as well as this thread's.
+ */
+const loadingTasks = new WeakMap();
+
+export const closePreview = (document_) => loadingTasks.get(document_)?.destroy();
 
 /**
  * Rasterises one page into a data URL, scaled so its longest side is `size`.
@@ -46,6 +59,65 @@ export async function renderThumbnail(document_, pageNumber, size = 220) {
   }).promise;
 
   return canvas.toDataURL('image/jpeg', 0.75);
+}
+
+/**
+ * Redraws every page as one JPEG — the pipeline behind the strongest
+ * compression level.
+ *
+ * This is the only way to guarantee a smaller file whatever the document
+ * contains: vector art, embedded fonts, colour profiles and revision history
+ * all collapse into a bitmap. The cost is the text layer, which is why the view
+ * says so before running it.
+ *
+ * Each entry carries the page's size in PDF points, not pixels, so the rebuilt
+ * document still prints at its original dimensions.
+ */
+export async function rasterizePages(source, { dpi = 150, quality = 0.62, onProgress } = {}) {
+  const document_ = await openPreview(source);
+  const canvas = document.createElement('canvas');
+  const context = canvas.getContext('2d');
+  const pages = [];
+
+  try {
+    for (let number = 1; number <= document_.numPages; number++) {
+      onProgress?.(number - 1, document_.numPages);
+
+      const page = await document_.getPage(number);
+      // Scale 1 is the page at its true size in points, rotation included.
+      const box = page.getViewport({ scale: 1 });
+      // Browsers refuse canvases beyond a few thousand pixels a side, so a
+      // poster-sized page gets less than the requested DPI rather than failing.
+      const scale = Math.min(dpi / 72, 4000 / Math.max(box.width, box.height));
+      const viewport = page.getViewport({ scale });
+
+      canvas.width = Math.max(Math.ceil(viewport.width), 1);
+      canvas.height = Math.max(Math.ceil(viewport.height), 1);
+      // JPEG has no alpha: an unpainted page would come out black.
+      context.fillStyle = '#ffffff';
+      context.fillRect(0, 0, canvas.width, canvas.height);
+
+      // 'print' rather than 'display': it draws annotations the way they are
+      // meant to appear on paper, and it does not drive the render loop from
+      // requestAnimationFrame — which a backgrounded tab never fires, leaving a
+      // display-intent render stalled halfway.
+      await page.render({ canvas, canvasContext: context, viewport, intent: 'print' }).promise;
+      page.cleanup();
+
+      const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', quality));
+      if (!blob) throw new Error('Halaman tidak dapat diubah menjadi gambar di peramban ini.');
+
+      pages.push({
+        bytes: new Uint8Array(await blob.arrayBuffer()),
+        width: box.width,
+        height: box.height,
+      });
+    }
+  } finally {
+    await closePreview(document_);
+  }
+
+  return pages;
 }
 
 /** First-page thumbnail of a file, cached per File so re-renders are free. */

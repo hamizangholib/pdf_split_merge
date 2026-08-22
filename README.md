@@ -35,8 +35,9 @@ Seluruh proses pengolahan dilakukan **100% secara lokal di browser Anda** menggu
   - Hasil PDF tetap berupa teks berbasis vektor (searchable & selectable) via mesin cetak browser.
   - Pembersihan HTML otomatis (sanitizer) untuk mencegah skrip berbahaya.
 - 🗜️ **Perkecil Ukuran PDF (Compress)**:
-  - Optimalkan dan kurangi ukuran berkas PDF secara efisien.
-  - Teks tetap dapat dicari/diseleksi dan formulir PDF tetap berfungsi (tanpa meraster teks menjadi gambar).
+  - Tiga tingkat: **Ringan** (tulis ulang struktur), **Sedang** (kecilkan setiap gambar JPEG/Flate ke maks. 1600 px dan kompresi ulang sebagai JPEG), **Kuat** (gambar ulang tiap halaman jadi satu JPEG pada 110/150/200 DPI).
+  - Pada tingkat Ringan dan Sedang teks tetap dapat dicari/diseleksi dan formulir PDF tetap berfungsi; tingkat Kuat menukar itu dengan ukuran terkecil.
+  - Hasil yang ternyata tidak lebih kecil dari aslinya tidak diunduh.
 - 📲 **PWA & Offline**:
   - Dapat dipasang di HP maupun desktop, lalu berjalan penuh tanpa koneksi internet.
   - Service worker mem-precache seluruh aset termasuk worker PDF.js.

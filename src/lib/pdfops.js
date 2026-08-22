@@ -289,3 +289,25 @@ export async function compress({ docId, level }, onProgress) {
   const document_ = await documentOf(docId);
   return compressPdf(document_, level, (position, total) => onProgress?.({ position, total }));
 }
+
+/**
+ * Rebuilds a document from pages already rasterised to JPEG on the main thread
+ * (see `rasterizePages`). Each entry's `width`/`height` are the original page
+ * size in points, so the result keeps its paper size no matter what resolution
+ * the bitmap was rendered at.
+ */
+export async function buildFromPages({ pages }, onProgress) {
+  if (!pages?.length) throw new Error('Tidak ada halaman yang bisa dikompresi.');
+
+  const output = stamp(await PDFDocument.create());
+
+  for (const [position, entry] of pages.entries()) {
+    onProgress?.({ position, total: pages.length });
+
+    const image = await output.embedJpg(entry.bytes);
+    const page = output.addPage([entry.width, entry.height]);
+    page.drawImage(image, { x: 0, y: 0, width: entry.width, height: entry.height });
+  }
+
+  return output.save({ useObjectStreams: true });
+}

@@ -104,11 +104,11 @@ export const routes = [
     icon: 'compress',
     title: 'Perkecil Ukuran PDF Tanpa Merusak Teks | PDF Toolkit',
     description:
-      'Kurangi ukuran file PDF tanpa mengubah halaman menjadi gambar — teks tetap bisa diseleksi dan dicari, formulir tetap berfungsi. Tanpa unggah.',
+      'Kurangi ukuran file PDF dengan tiga tingkat kompresi: rapikan struktur, kecilkan gambar tanpa merusak teks, atau gambar ulang setiap halaman untuk hasil paling kecil. Tanpa unggah.',
     heading: 'Perkecil ukuran PDF',
     intro:
-      'Tanpa mengubah halaman menjadi gambar — teks tetap bisa diseleksi dan dicari, formulir tetap berfungsi.',
-    blurb: 'Kurangi ukuran file tanpa mengubah halaman menjadi gambar — teks tetap utuh.',
+      'Pilih seberapa jauh Anda mau menukar kualitas dengan ukuran — dari merapikan struktur saja sampai menggambar ulang seluruh halaman.',
+    blurb: 'Kecilkan gambar di dalam PDF tanpa merusak teks, atau gambar ulang halaman untuk hasil paling kecil.',
   },
 ];
 

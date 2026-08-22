@@ -8,7 +8,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "icons": "node scripts/make-icons.mjs",
-    "selfcheck": "node src/lib/zip.selfcheck.mjs && node src/lib/markdown.selfcheck.mjs"
+    "selfcheck": "node src/lib/zip.selfcheck.mjs && node src/lib/markdown.selfcheck.mjs && node src/lib/compress.selfcheck.mjs"
   },
   "dependencies": {
     "lucide": "^1.28.0",

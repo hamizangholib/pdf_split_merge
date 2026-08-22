@@ -118,6 +118,14 @@ export const abortImages = (imagesId) => run('imagesAbort', { imagesId }).catch(
 export const compressDocument = (docId, level, onProgress) =>
   run('compress', { docId, level }, { onProgress });
 
+/** Assembles pages already rasterised to JPEG back into one PDF. */
+export const buildFromPages = (pages, onProgress) =>
+  run(
+    'buildFromPages',
+    { pages },
+    { transfer: pages.map((page) => page.bytes.buffer), onProgress },
+  );
+
 /* ------------------------------------------------------------- pure helper */
 
 /**

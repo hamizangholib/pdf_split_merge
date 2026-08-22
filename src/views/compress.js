@@ -7,14 +7,27 @@ import {
   html,
   paintIcons,
   paintStatus,
+  readFileBytes,
   resultLink,
   setVisible,
   stripPdfExtension,
 } from '../lib/ui.js';
-import { closeDocument, compressDocument, openDocument } from '../lib/pdf.js';
+import { buildFromPages, closeDocument, compressDocument, openDocument } from '../lib/pdf.js';
+import { rasterizePages } from '../lib/preview.js';
 import { createFileLoader } from '../lib/loader.js';
 import { subNavMarkup } from '../lib/nav.js';
 import { brandIcon } from '../lib/icons.js';
+
+/**
+ * How hard the "kuat" level squeezes. Resolution matters more than JPEG quality
+ * here: below ~110 DPI small text starts to blur, above ~200 the file stops
+ * shrinking much.
+ */
+const rasterPresets = {
+  crisp: { dpi: 200, quality: 0.75, label: 'Tajam — 200 DPI' },
+  balanced: { dpi: 150, quality: 0.62, label: 'Seimbang — 150 DPI' },
+  small: { dpi: 110, quality: 0.5, label: 'Sekecil mungkin — 110 DPI' },
+};
 
 export function renderCompress() {
   /** @type {{ file: File|null, docId: number|null, pageCount: number, status: string|null, message: string, busy: boolean }} */
@@ -28,8 +41,8 @@ export function renderCompress() {
         <header class="space-y-3">
           <h1 class="text-display-md text-ink">Perkecil ukuran PDF</h1>
           <p class="max-w-[620px] text-body text-ink-80">
-            Tanpa mengubah halaman menjadi gambar — teks tetap bisa diseleksi dan dicari,
-            formulir tetap berfungsi.
+            Pilih seberapa jauh Anda mau menukar kualitas dengan ukuran — dari
+            merapikan struktur saja sampai menggambar ulang seluruh halaman.
           </p>
         </header>
 
@@ -52,7 +65,7 @@ export function renderCompress() {
           <fieldset class="space-y-3">
             <legend class="mb-3 text-tagline text-ink">Tingkat kompresi</legend>
             <label class="${cls.radioCard}">
-              <input type="radio" name="level" value="light" checked class="mt-1 accent-action" />
+              <input type="radio" name="level" value="light" class="mt-1 accent-action" />
               <span class="min-w-0">
                 <span class="block text-caption text-ink">Ringan — rapikan struktur</span>
                 <span class="block text-fine text-ink-48">
@@ -63,22 +76,48 @@ export function renderCompress() {
               </span>
             </label>
             <label class="${cls.radioCard}">
-              <input type="radio" name="level" value="medium" class="mt-1 accent-action" />
+              <input type="radio" name="level" value="medium" checked class="mt-1 accent-action" />
               <span class="min-w-0">
-                <span class="block text-caption text-ink">Sedang — kecilkan gambar JPEG</span>
+                <span class="block text-caption text-ink">Sedang — kecilkan gambar</span>
                 <span class="block text-fine text-ink-48">
-                  Gambar JPEG di dalam dokumen diturunkan ke maksimal 2000 piksel pada
-                  sisi terpanjang dan dikompresi ulang. Sangat efektif untuk hasil
-                  pindaian; hampir tidak berpengaruh pada dokumen yang isinya teks saja.
+                  Setiap gambar di dalam dokumen diturunkan ke maksimal 1600 piksel pada
+                  sisi terpanjang dan dikompresi ulang sebagai JPEG. Teks tetap bisa
+                  diseleksi dan formulir tetap berfungsi. Sangat efektif untuk pindaian
+                  dan tangkapan layar; hampir tidak berpengaruh pada dokumen teks saja.
+                </span>
+              </span>
+            </label>
+            <label class="${cls.radioCard}">
+              <input type="radio" name="level" value="strong" class="mt-1 accent-action" />
+              <span class="min-w-0">
+                <span class="block text-caption text-ink">Kuat — gambar ulang setiap halaman</span>
+                <span class="block text-fine text-ink-48">
+                  Setiap halaman digambar ulang menjadi satu JPEG. Ini selalu mengecilkan
+                  dokumen yang berat, tetapi <strong class="font-medium text-ink-80">teks
+                  berubah menjadi gambar</strong>: tidak bisa lagi diseleksi, dicari, atau
+                  diisi sebagai formulir. Ukuran kertas tetap sama.
+                </span>
+                <span data-preset-wrap class="mt-3 block" style="display: none">
+                  <span class="block text-fine text-ink-48">Kualitas hasil</span>
+                  <select
+                    data-preset
+                    class="mt-1 w-full max-w-xs rounded-sm border border-hairline bg-white px-3 py-2 text-caption text-ink"
+                  >
+                    ${Object.entries(rasterPresets)
+                      .map(
+                        ([key, preset]) =>
+                          `<option value="${key}"${key === 'balanced' ? ' selected' : ''}>${preset.label}</option>`,
+                      )
+                      .join('')}
+                  </select>
                 </span>
               </span>
             </label>
           </fieldset>
 
           <p class="text-fine text-ink-48">
-            Kompresi maksimal dan target ukuran tidak tersedia di sini: satu-satunya cara
-            menjamin ukuran tertentu adalah mengubah setiap halaman menjadi gambar, dan
-            itu menghapus teks dari dokumen.
+            Target ukuran pasti tidak tersedia: seberapa besar hasil akhirnya tergantung
+            isi dokumen. Kalau hasilnya ternyata tidak lebih kecil, file tidak diunduh.
           </p>
 
           <div data-status></div>
@@ -97,6 +136,10 @@ export function renderCompress() {
   const metaHost = root.querySelector('[data-meta]');
   const statusHost = root.querySelector('[data-status]');
   const compressButton = root.querySelector('[data-compress]');
+  const presetWrap = root.querySelector('[data-preset-wrap]');
+  const presetSelect = root.querySelector('[data-preset]');
+
+  const chosenLevel = () => root.querySelector('input[name="level"]:checked').value;
 
   function setStatus(status, message) {
     state.status = status;
@@ -113,6 +156,11 @@ export function renderCompress() {
     setStatus(null, '');
   }
 
+  // The resolution picker only means anything for the level that rasterises.
+  for (const radio of root.querySelectorAll('input[name="level"]')) {
+    radio.addEventListener('change', () => setVisible(presetWrap, chosenLevel() === 'strong'));
+  }
+
   const loader = createFileLoader({
     id: 'compress',
     onReset: clearDocument,
@@ -127,11 +175,34 @@ export function renderCompress() {
       nameHost.textContent = file.name;
       metaHost.textContent = `${state.pageCount} halaman · ${formatBytes(file.size)}`;
       setVisible(detailHost, true);
+      setVisible(presetWrap, chosenLevel() === 'strong');
+      paintIcons(detailHost);
     },
   });
   root.querySelector('[data-loader]').replaceWith(loader.element);
 
   root.querySelector('[data-reset]').addEventListener('click', () => loader.reset());
+
+  /**
+   * The `strong` path runs where pdf.js already lives — the main thread — and
+   * hands the finished page images to the worker to be sewn back into a PDF.
+   * The file is re-read from disk because the original bytes were transferred
+   * to the worker when it was opened.
+   */
+  async function rasterize() {
+    const preset = rasterPresets[presetSelect.value] ?? rasterPresets.balanced;
+    const bytes = await readFileBytes(state.file);
+
+    const pages = await rasterizePages(bytes, {
+      dpi: preset.dpi,
+      quality: preset.quality,
+      onProgress: (position, total) =>
+        setStatus('working', `Menggambar ulang halaman ${position + 1} dari ${total}…`),
+    });
+
+    setStatus('working', 'Menyusun ulang dokumen…');
+    return { bytes: await buildFromPages(pages), recoded: pages.length, rasterised: true };
+  }
 
   compressButton.addEventListener('click', async () => {
     state.busy = true;
@@ -139,20 +210,27 @@ export function renderCompress() {
     setStatus('working', 'Membaca ulang dokumen…');
 
     try {
-      const level = root.querySelector('input[name="level"]:checked').value;
+      const level = chosenLevel();
 
-      const { bytes, recoded } = await compressDocument(state.docId, level, (detail) =>
-        setStatus('working', `Mengompresi gambar ${detail.position + 1} dari ${detail.total}…`),
-      );
+      const { bytes, recoded, rasterised } =
+        level === 'strong'
+          ? await rasterize()
+          : await compressDocument(state.docId, level, (detail) =>
+              setStatus('working', `Mengompresi gambar ${detail.position + 1} dari ${detail.total}…`),
+            );
 
       const before = state.file.size;
       const saved = before - bytes.length;
       const percent = Math.round((saved / before) * 100);
 
       if (saved <= 0) {
+        const advice =
+          level === 'strong'
+            ? ' Dokumen ini isinya teks dan vektor, yang justru lebih boros sebagai gambar — gunakan tingkat Ringan atau Sedang.'
+            : ' Coba tingkat berikutnya kalau Anda bersedia menukar sedikit kualitas.';
         setStatus(
           'warning',
-          `Tidak ada penghematan: hasilnya ${formatBytes(bytes.length)}, sama atau lebih besar dari aslinya (${formatBytes(before)}). File ini sudah padat — tidak diunduh agar Anda tidak menyimpan versi yang lebih besar.`,
+          `Tidak ada penghematan: hasilnya ${formatBytes(bytes.length)}, sama atau lebih besar dari aslinya (${formatBytes(before)}). Tidak diunduh agar Anda tidak menyimpan versi yang lebih besar.${advice}`,
         );
         return;
       }
@@ -160,7 +238,13 @@ export function renderCompress() {
       const filename = `${stripPdfExtension(state.file.name)}-kecil.pdf`;
       const url = downloadBytes(bytes, filename, 'application/pdf', { keep: true });
 
-      const detail = recoded ? ` ${recoded} gambar dikompresi ulang.` : '';
+      let detail = '';
+      if (rasterised) detail = ` ${recoded} halaman digambar ulang; teks kini berupa gambar.`;
+      else if (recoded) detail = ` ${recoded} gambar dikompresi ulang.`;
+      else if (level === 'medium') {
+        detail = ' Tidak ada gambar yang bisa dikecilkan — coba tingkat Kuat kalau perlu lebih kecil.';
+      }
+
       setStatus(
         'success',
         `${formatBytes(before)} → ${formatBytes(bytes.length)}, hemat ${percent}%.${detail} Disimpan sebagai "${escapeHtml(filename)}".` +
